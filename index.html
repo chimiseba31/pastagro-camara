@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PastAgro · Distancia al Plato</title>
+  <style>
+    :root {
+      --primary: #1b4332;
+      --accent: #2d6a4f;
+      --bg: #f4f7f5;
+      --card: #ffffff;
+      --text: #1a2421;
+      --muted: #5c6b63;
+      --border: #dce4df;
+      --ok-bg: #d8f3dc;
+      --warn-bg: #fff3cd;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 14px; max-width: 580px; margin: 0 auto; padding-bottom: 40px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+    h1 { font-size: 1.2rem; color: var(--primary); margin-bottom: 4px; }
+    .subtitulo { font-size: 0.82rem; color: var(--muted); margin-bottom: 12px; }
+    label { display: block; font-size: 0.78rem; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+    input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 10px; font-size: 0.95rem; margin-bottom: 10px; background: #fafcfb; }
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .btn-medir {
+      width: 100%; padding: 16px; border: none; border-radius: 12px;
+      background: var(--accent); color: #fff; font-size: 1.1rem; font-weight: 800;
+      cursor: pointer; margin-top: 2px;
+    }
+    .btn-medir:disabled { opacity: 0.6; }
+    .btn-sec {
+      width: 100%; padding: 10px; border: 1.5px solid var(--primary); border-radius: 10px;
+      background: transparent; color: var(--primary); font-size: 0.88rem; font-weight: 700;
+      cursor: pointer; margin-top: 8px;
+    }
+    video {
+      width: 100%; max-height: 240px; object-fit: cover; border-radius: 12px;
+      background: #000; display: none; margin-top: 10px; border: 2px solid var(--accent);
+    }
+    video.activa { display: block; }
+    .estado { font-size: 0.82rem; color: var(--muted); margin-top: 8px; text-align: center; min-height: 20px; }
+    .res-box { background: var(--ok-bg); border-radius: 12px; padding: 14px; text-align: center; margin-top: 10px; }
+    .res-dist { font-size: 2.1rem; font-weight: 900; color: var(--primary); }
+    .res-sub { font-size: 0.85rem; color: var(--accent); font-weight: 700; margin-top: 4px; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+    .stat { background: #eef5f0; border-radius: 10px; padding: 10px; text-align: center; }
+    .stat-val { font-size: 1.2rem; font-weight: 800; color: var(--primary); }
+    .stat-lbl { font-size: 0.72rem; color: var(--muted); font-weight: 700; }
+    .lista { max-height: 240px; overflow-y: auto; border-top: 1px solid var(--border); }
+    .item { display: flex; justify-content: space-between; align-items: center; padding: 9px 4px; border-bottom: 1px solid #eef2ef; font-size: 0.88rem; }
+    .pill-ok { font-size: 0.72rem; background: var(--ok-bg); color: var(--primary); padding: 2px 7px; border-radius: 99px; font-weight: 700; }
+    .pill-pend { font-size: 0.72rem; background: var(--warn-bg); color: #856404; padding: 2px 7px; border-radius: 99px; font-weight: 700; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>🌱 PastAgro · Medir Distancia al Plato</h1>
+    <p class="subtitulo">Al tocar Medir, calcula automáticamente la distancia al plato en cm y la envía a Google Sheets.</p>
+
+    <label>URL de implementación Web App (Google Apps Script /exec)</label>
+    <input type="url" id="scriptUrl" placeholder="https://script.google.com/macros/s/.../exec" onchange="guardarConfig()">
+
+    <div class="row-2">
+      <div>
+        <label>Potrero / Lote</label>
+        <input type="text" id="loteNombre" value="Potrero 1" onchange="guardarConfig()">
+      </div>
+      <div>
+        <label>Distancia base 0 cm (cm)</label>
+        <input type="number" id="distBaseCm" value="80" step="1" onchange="guardarConfig()">
+      </div>
+    </div>
+
+    <div class="row-2">
+      <div>
+        <label>Diámetro plato (cm)</label>
+        <input type="number" id="diametroPlatoCm" value="35.6" step="0.1" onchange="guardarConfig()">
+      </div>
+      <div>
+        <label>Referencia 0 cm (px)</label>
+        <input type="number" id="diametro0Px" value="52" step="0.5" onchange="guardarConfig()">
+      </div>
+    </div>
+
+    <label>Distancia automática cargada (cm)</label>
+    <input type="number" id="distanciaCargadaCm" step="0.1" placeholder="Se carga automáticamente al tocar Medir" readonly>
+
+    <button id="btnMedir" class="btn-medir" onclick="medirDistanciaAutomatica()">📏 Medir</button>
+    <button id="btnCalibrar0" class="btn-sec" onclick="calibrarCeroAutomatico()">🎯 Calibrar 0 cm (plato en suelo pelado)</button>
+
+    <video id="videoCam" autoplay playsinline muted></video>
+    <canvas id="canvasProc" style="display:none;"></canvas>
+    <div id="estadoTxt" class="estado">Listo. Tocá Medir al avanzar por el campo.</div>
+
+    <div class="res-box">
+      <div class="res-dist" id="ultimaDistancia">-- cm</div>
+      <div class="res-sub" id="detalleLectura">Sin mediciones todavía</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-val" id="statCant">0</div>
+        <div class="stat-lbl">LECTURAS</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="statPromDist">0.0 cm</div>
+        <div class="stat-lbl">DISTANCIA PROM.</div>
+      </div>
+    </div>
+    <button class="btn-sec" onclick="reenviarPendientes()">☁️ Reenviar pendientes a Sheets (<span id="cantPend">0</span>)</button>
+    <div id="listaLecturas" class="lista" style="margin-top:10px;"></div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'pastagro_gh_estado_v1';
+    let estadoApp = {
+      scriptUrl: '',
+      lote: 'Potrero 1',
+      distBaseCm: 80,
+      diametroPlatoCm: 35.6,
+      diametro0Px: 52,
+      lecturas: []
+    };
+    let gpsActual = { lat: '', lng: '', acc: '' };
+
+    function cargarEstado() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          estadoApp = Object.assign(estadoApp, parsed);
+        }
+      } catch (e) {}
+
+      document.getElementById('scriptUrl').value = estadoApp.scriptUrl || '';
+      document.getElementById('loteNombre').value = estadoApp.lote || 'Potrero 1';
+      document.getElementById('distBaseCm').value = estadoApp.distBaseCm || 80;
+      document.getElementById('diametroPlatoCm').value = estadoApp.diametroPlatoCm || 35.6;
+      document.getElementById('diametro0Px').value = estadoApp.diametro0Px || 52;
+      renderizarTodo();
+    }
+
+    function guardarConfig() {
+      estadoApp.scriptUrl = document.getElementById('scriptUrl').value.trim();
+      estadoApp.lote = document.getElementById('loteNombre').value.trim() || 'Lote';
+      estadoApp.distBaseCm = parseFloat(document.getElementById('distBaseCm').value) || 80;
+      estadoApp.diametroPlatoCm = parseFloat(document.getElementById('diametroPlatoCm').value) || 35.6;
+      estadoApp.diametro0Px = parseFloat(document.getElementById('diametro0Px').value) || 52;
+      persistirEstado();
+    }
+
+    function persistirEstado() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(estadoApp));
+      } catch (e) {}
+    }
+
+    if ('geolocation' in navigator) {
+      navigator.geolocation.watchPosition(
+        (pos) => {
+          gpsActual = {
+            lat: Number(pos.coords.latitude.toFixed(6)),
+            lng: Number(pos.coords.longitude.toFixed(6)),
+            acc: Math.round(pos.coords.accuracy)
+          };
+        },
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+      );
+    }
+
+    function detectarDiametroPx(video, canvas) {
+      if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return null;
+      const w = 160;
+      const h = Math.round((video.videoHeight / video.videoWidth) * w) || 120;
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(video, 0, 0, w, h);
+      const d = ctx.getImageData(0, 0, w, h).data;
+
+      let sumBorde = 0, nBorde = 0;
+      for (let y = 0; y < h; y += 2) {
+        for (let x = 0; x < w; x += 2) {
+          if (x < w * 0.16 || x > w * 0.84 || y < h * 0.16 || y > h * 0.84) {
+            const i = (y * w + x) * 4;
+            sumBorde += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+            nBorde++;
+          }
+        }
+      }
+      const umbralClaro = Math.max(75, Math.min(238, (nBorde ? sumBorde / nBorde : 90) + 24));
+
+      let sumX = 0, sumY = 0, count = 0;
+      const pts = [];
+      for (let y = 4; y < h - 4; y += 2) {
+        for (let x = 4; x < w - 4; x += 2) {
+          const i = (y * w + x) * 4;
+          const r = d[i], g = d[i + 1], b = d[i + 2];
+          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          const dif = Math.max(r, g, b) - Math.min(r, g, b);
+          if (lum >= umbralClaro && lum <= 250 && dif <= 55) {
+            sumX += x; sumY += y; count++;
+            pts.push([x, y]);
+          }
+        }
+      }
+      if (count < 20) return null;
+
+      const cx = sumX / count, cy = sumY / count;
+      let minX = w, maxX = 0, minY = h, maxY = 0, validos = 0;
+      for (const [px, py] of pts) {
+        if (Math.hypot(px - cx, py - cy) <= Math.min(w, h) * 0.46) {
+          validos++;
+          if (px < minX) minX = px;
+          if (px > maxX) maxX = px;
+          if (py < minY) minY = py;
+          if (py > maxY) maxY = py;
+        }
+      }
+      const ancho = maxX - minX, alto = maxY - minY;
+      if (validos < 20 || Math.max(ancho, alto) < 18) return null;
+      return (ancho + alto) / 2;
+    }
+
+    async function capturarDiametroPlato() {
+      const video = document.getElementById('videoCam');
+      const canvas = document.getElementById('canvasProc');
+      const estado = document.getElementById('estadoTxt');
+
+      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+        throw new Error('Este navegador no soporta cámara en vivo.');
+      }
+
+      estado.innerText = 'Abriendo cámara...';
+      let stream = null;
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 640 },
+            height: { ideal: 480 }
+          },
+          audio: false
+        });
+
+        video.srcObject = stream;
+        video.classList.add('activa');
+        await video.play();
+        estado.innerText = 'Midiendo distancia al plato automáticamente...';
+
+        const muestrasPx = [];
+        for (let i = 0; i < 28; i++) {
+          await new Promise(r => setTimeout(r, 70));
+          const medido = detectarDiametroPx(video, canvas);
+          if (medido !== null) {
+            muestrasPx.push(medido);
+            if (muestrasPx.length >= 3) break;
+          }
+        }
+
+        if (muestrasPx.length === 0) return null;
+        const promPx = muestrasPx.reduce((a, b) => a + b, 0) / muestrasPx.length;
+        return Math.round(promPx * 10) / 10;
+      } finally {
+        if (stream) {
+          stream.getTracks().forEach(t => {
+            try { t.stop(); } catch (e) {}
+          });
+        }
+        try { video.pause(); } catch (e) {}
+        video.srcObject = null;
+        video.classList.remove('activa');
+      }
+    }
+
+    async function calibrarCeroAutomatico() {
+      guardarConfig();
+      const btnMedir = document.getElementById('btnMedir');
+      const btnCal = document.getElementById('btnCalibrar0');
+      const estado = document.getElementById('estadoTxt');
+      btnMedir.disabled = true;
+      btnCal.disabled = true;
+
+      try {
+        const dPx = await capturarDiametroPlato();
+        if (!dPx) {
+          estado.innerText = 'No se detectó el plato en 0 cm. Acercá o centrá el plato.';
+          return;
+        }
+        estadoApp.diametro0Px = dPx;
+        document.getElementById('diametro0Px').value = dPx;
+        persistirEstado();
+        estado.innerText = `Referencia 0 cm calibrada en ${dPx} px.`;
+      } catch (err) {
+        estado.innerText = 'Error al calibrar: ' + (err.message || err);
+      } finally {
+        btnMedir.disabled = false;
+        btnCal.disabled = false;
+      }
+    }
+
+    async function enviarAGoogleSheet(payload) {
+      if (!estadoApp.scriptUrl) return false;
+      try {
+        await fetch(estadoApp.scriptUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        });
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    async function medirDistanciaAutomatica() {
+      guardarConfig();
+      const btnMedir = document.getElementById('btnMedir');
+      const btnCal = document.getElementById('btnCalibrar0');
+      const estado = document.getElementById('estadoTxt');
+      btnMedir.disabled = true;
+      btnCal.disabled = true;
+
+      try {
+        const dPx = await capturarDiametroPlato();
+        if (!dPx) {
+          estado.innerText = 'No se detectó el plato. Acercá un poco o revisá el encuadre.';
+          return;
+        }
+
+        const distBase = estadoApp.distBaseCm || 80;
+        const d0Px = estadoApp.diametro0Px || 52;
+        const distanciaCm = Math.round((distBase * (d0Px / Math.max(1, dPx))) * 10) / 10;
+        const alturaCm = Math.max(0, Math.round((distBase - distanciaCm) * 10) / 10);
+
+        document.getElementById('distanciaCargadaCm').value = distanciaCm;
+        document.getElementById('ultimaDistancia').innerText = `${distanciaCm} cm`;
+        document.getElementById('detalleLectura').innerText =
+          `Distancia automática: ${distanciaCm} cm · Altura pasto: ${alturaCm} cm (${dPx} px)`;
+
+        const registro = {
+          id: Date.now(),
+          tipo: 'lectura_distancia',
+          hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          lote: estadoApp.lote,
+          distanciaCm,
+          alturaCm,
+          diametroPx: dPx,
+          lat: gpsActual.lat,
+          lng: gpsActual.lng,
+          acc: gpsActual.acc,
+          enviado: false
+        };
+
+        const enviado = await enviarAGoogleSheet(registro);
+        registro.enviado = enviado;
+
+        estadoApp.lecturas.unshift(registro);
+        persistirEstado();
+        renderizarTodo();
+
+        estado.innerText = enviado
+          ? `Cargado: ${distanciaCm} cm y enviado a Google Sheets.`
+          : `Cargado: ${distanciaCm} cm (guardado local para enviar a Sheets).`;
+      } catch (err) {
+        estado.innerText = 'No se pudo abrir la cámara: ' + (err.message || err);
+      } finally {
+        btnMedir.disabled = false;
+        btnCal.disabled = false;
+      }
+    }
+
+    async function reenviarPendientes() {
+      guardarConfig();
+      if (!estadoApp.scriptUrl) {
+        document.getElementById('estadoTxt').innerText = 'Pegá primero la URL /exec de Google Apps Script.';
+        return;
+      }
+      let enviadosAhora = 0;
+      for (const item of estadoApp.lecturas) {
+        if (!item.enviado) {
+          const ok = await enviarAGoogleSheet(item);
+          if (ok) {
+            item.enviado = true;
+            enviadosAhora++;
+          }
+        }
+      }
+      persistirEstado();
+      renderizarTodo();
+      document.getElementById('estadoTxt').innerText =
+        enviadosAhora > 0 ? `Se enviaron ${enviadosAhora} lecturas a Google Sheets.` : 'No había pendientes o falló el envío.';
+    }
+
+    function renderizarTodo() {
+      const total = estadoApp.lecturas.length;
+      const pend = estadoApp.lecturas.filter(x => !x.enviado).length;
+      const prom = total > 0
+        ? (estadoApp.lecturas.reduce((acc, x) => acc + (Number(x.distanciaCm) || 0), 0) / total).toFixed(1)
+        : '0.0';
+
+      document.getElementById('statCant').innerText = total;
+      document.getElementById('statPromDist').innerText = `${prom} cm`;
+      document.getElementById('cantPend').innerText = pend;
+
+      document.getElementById('listaLecturas').innerHTML = estadoApp.lecturas.map((x, idx) => `
+        <div class="item">
+          <div>
+            <strong>#${total - idx}</strong> · ${x.hora} · <small>${x.lote}</small>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <strong>${x.distanciaCm} cm</strong>
+            <span class="${x.enviado ? 'pill-ok' : 'pill-pend'}">${x.enviado ? 'Sheet' : 'Local'}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    cargarEstado();
+  </script>
+</body>
+</html>
