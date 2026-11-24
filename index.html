@@ -3,428 +3,1105 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PastAgro · Distancia al Plato</title>
+  <title>PastAgro</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     :root {
-      --primary: #1b4332;
-      --accent: #2d6a4f;
-      --bg: #f4f7f5;
-      --card: #ffffff;
-      --text: #1a2421;
-      --muted: #5c6b63;
-      --border: #dce4df;
-      --ok-bg: #d8f3dc;
-      --warn-bg: #fff3cd;
+      --primary: #1b4332; --accent: #40916c; --bg: #f4f7f5;
+      --card: #ffffff; --text: #1a2421; --muted: #6c757d;
+      --border: #dce4df; --danger: #c1121f; --warning: #e07a5f;
+      --draft-bg: #fff9eb; --draft-border: #e9c46a; --draft-text: #9c6615;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background: var(--bg); color: var(--text); padding: 14px; max-width: 580px; margin: 0 auto; padding-bottom: 40px; }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
-    h1 { font-size: 1.2rem; color: var(--primary); margin-bottom: 4px; }
-    .subtitulo { font-size: 0.82rem; color: var(--muted); margin-bottom: 12px; }
-    label { display: block; font-size: 0.78rem; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
-    input { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 10px; font-size: 0.95rem; margin-bottom: 10px; background: #fafcfb; }
-    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .btn-medir {
-      width: 100%; padding: 16px; border: none; border-radius: 12px;
-      background: var(--accent); color: #fff; font-size: 1.1rem; font-weight: 800;
-      cursor: pointer; margin-top: 2px;
+    body { background: var(--bg); color: var(--text); padding-bottom: 82px; }
+
+    header {
+      background: var(--primary); color: white; padding: 14px 18px;
+      display: flex; justify-content: space-between; align-items: center;
+      position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 6px rgba(0,0,0,0.15);
     }
-    .btn-medir:disabled { opacity: 0.6; }
-    .btn-sec {
-      width: 100%; padding: 10px; border: 1.5px solid var(--primary); border-radius: 10px;
-      background: transparent; color: var(--primary); font-size: 0.88rem; font-weight: 700;
-      cursor: pointer; margin-top: 8px;
+    header h1 { font-size: 1.25rem; font-weight: 700; }
+    .sync-pill {
+      background: var(--accent); color: white; border: none; padding: 6px 12px;
+      border-radius: 20px; font-size: 0.78rem; font-weight: 700; cursor: pointer;
     }
-    video {
-      width: 100%; max-height: 240px; object-fit: cover; border-radius: 12px;
-      background: #000; display: none; margin-top: 10px; border: 2px solid var(--accent);
-    }
+    .sync-pill.pendiente { background: var(--warning); animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.75; } 100% { opacity: 1; } }
+
+    .container { max-width: 600px; margin: 0 auto; padding: 14px; }
+    .section { display: none; }
+    .section.active { display: block; }
+
+    .card { background: var(--card); border-radius: 14px; padding: 16px; margin-bottom: 14px; border: 1px solid var(--border); }
+    .card h2 { font-size: 1.02rem; margin-bottom: 10px; color: var(--primary); }
+
+    label { display: block; font-size: 0.83rem; font-weight: 600; margin-bottom: 5px; color: var(--muted); }
+    input, select { width: 100%; padding: 11px; border: 1px solid var(--border); border-radius: 10px; font-size: 1rem; margin-bottom: 12px; background: #fafcfb; }
+
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .inline-select { display: flex; gap: 8px; align-items: stretch; margin-bottom: 12px; }
+    .inline-select select { margin-bottom: 0; flex: 1; }
+    .btn-mini { background: var(--primary); color: white; border: none; border-radius: 10px; padding: 0 14px; font-weight: 700; font-size: 0.85rem; cursor: pointer; }
+
+    .drawer-box { display: none; background: #f0f6f2; border: 1px solid #c7dfd0; border-radius: 12px; padding: 12px; margin-bottom: 14px; }
+    .drawer-box.open { display: block; }
+    .drawer-box h3 { font-size: 0.9rem; color: var(--primary); margin-bottom: 8px; }
+
+    .btn { width: 100%; padding: 13px; border: none; border-radius: 12px; font-size: 0.96rem; font-weight: 700; cursor: pointer; text-align: center; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-accent { background: var(--accent); color: white; }
+    .btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
+    .btn-danger { background: var(--danger); color: white; padding: 6px 10px; font-size: 0.8rem; width: auto; }
+
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .stat-box { background: #eef5f0; padding: 12px; border-radius: 12px; text-align: center; }
+    .stat-value { font-size: 1.35rem; font-weight: 800; color: var(--primary); }
+    .stat-label { font-size: 0.74rem; color: var(--muted); font-weight: 600; margin-top: 2px; }
+
+    .sample-list { max-height: 220px; overflow-y: auto; border-top: 1px solid var(--border); }
+    .sample-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 4px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+
+    video { width: 100%; max-height: 230px; object-fit: cover; border-radius: 12px; background: #000; display: none; margin-bottom: 10px; border: 2px solid var(--accent); }
     video.activa { display: block; }
-    .estado { font-size: 0.82rem; color: var(--muted); margin-top: 8px; text-align: center; min-height: 20px; }
-    .res-box { background: var(--ok-bg); border-radius: 12px; padding: 14px; text-align: center; margin-top: 10px; }
-    .res-dist { font-size: 2.1rem; font-weight: 900; color: var(--primary); }
-    .res-sub { font-size: 0.85rem; color: var(--accent); font-weight: 700; margin-top: 4px; }
-    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
-    .stat { background: #eef5f0; border-radius: 10px; padding: 10px; text-align: center; }
-    .stat-val { font-size: 1.2rem; font-weight: 800; color: var(--primary); }
-    .stat-lbl { font-size: 0.72rem; color: var(--muted); font-weight: 700; }
-    .lista { max-height: 240px; overflow-y: auto; border-top: 1px solid var(--border); }
-    .item { display: flex; justify-content: space-between; align-items: center; padding: 9px 4px; border-bottom: 1px solid #eef2ef; font-size: 0.88rem; }
-    .pill-ok { font-size: 0.72rem; background: var(--ok-bg); color: var(--primary); padding: 2px 7px; border-radius: 99px; font-weight: 700; }
-    .pill-pend { font-size: 0.72rem; background: var(--warn-bg); color: #856404; padding: 2px 7px; border-radius: 99px; font-weight: 700; }
+
+    .curvas-banner { background: linear-gradient(135deg, #1b4332, #2d6a4f); color: white; border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+    .curvas-banner h2 { color: white; font-size: 1.2rem; margin-bottom: 2px; }
+    .curvas-banner p { font-size: 0.83rem; opacity: 0.9; }
+
+    .preset-trigger { display: flex; justify-content: space-between; align-items: center; background: #eef5f0; border: 1px solid #c7dfd0; border-radius: 14px; padding: 14px; margin-bottom: 14px; cursor: pointer; }
+    .preset-trigger-left { display: flex; align-items: center; gap: 12px; }
+    .preset-icon { width: 40px; height: 40px; border-radius: 10px; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+    .preset-list { display: none; margin-bottom: 14px; }
+    .preset-list.open { display: block; }
+    .preset-card { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+
+    .draft-card { background: var(--draft-bg); border: 1px solid var(--draft-border); border-radius: 14px; padding: 14px; margin-bottom: 10px; position: relative; cursor: pointer; }
+    .draft-badge { font-size: 0.7rem; font-weight: 800; color: var(--draft-text); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 4px; }
+    .draft-title { font-size: 1.05rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .draft-sub { font-size: 0.82rem; color: var(--draft-text); font-weight: 600; margin-bottom: 4px; }
+    .draft-close { position: absolute; top: 12px; right: 12px; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--draft-border); background: white; color: var(--draft-text); font-weight: 700; cursor: pointer; }
+
+    .muestra-cal-card { background: white; border: 1px solid var(--border); border-left: 5px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+    .muestra-cal-card.valida { border-left-color: var(--accent); }
+    .muestra-cal-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .muestra-cal-cm { display: flex; align-items: center; gap: 8px; }
+    .muestra-cal-cm input { width: 95px; margin-bottom: 0; font-weight: 800; font-size: 1.05rem; text-align: center; padding: 8px; }
+    .muestra-cal-res { font-size: 0.8rem; color: var(--muted); font-weight: 600; margin-top: 2px; }
+    .muestra-cal-card.valida .muestra-cal-res { color: var(--primary); }
+    .regresion-box { background: #eef5f0; border: 1px solid #c7dfd0; border-radius: 12px; padding: 12px; margin: 12px 0; font-size: 0.85rem; }
+
+    nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; display: flex; border-top: 1px solid var(--border); height: 64px; z-index: 100; }
+    nav button { flex: 1; border: none; background: none; font-size: 0.7rem; font-weight: 600; color: var(--muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
+    nav button.active { color: var(--primary); border-top: 3px solid var(--primary); }
+    nav span { font-size: 1.1rem; }
+
+    #modalOverlay {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.65); z-index: 9999; justify-content: center; align-items: center; padding: 20px;
+    }
+    #modalContainer {
+      background: var(--card); width: 100%; max-width: 360px; border-radius: 16px;
+      padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: center;
+    }
+    #modalTitle { font-size: 1.1rem; color: var(--primary); margin-bottom: 8px; font-weight: 700; }
+    #modalMessage { font-size: 0.92rem; color: var(--text); margin-bottom: 20px; line-height: 1.45; }
+    #modalButtons { display: flex; gap: 10px; }
+    #modalButtons button { flex: 1; padding: 11px; border-radius: 10px; font-weight: 700; font-size: 0.9rem; cursor: pointer; border: none; }
+    #modalBtnOk { background: var(--primary); color: white; }
+    #modalBtnCancel { background: var(--border); color: var(--text); }
   </style>
 </head>
 <body>
 
-  <div class="card">
-    <h1>🌱 PastAgro · Medir Distancia al Plato</h1>
-    <p class="subtitulo">Al tocar Medir, calcula automáticamente la distancia al plato en cm y la envía a Google Sheets.</p>
+<header>
+  <h1>🌱 PastAgro</h1>
+  <button id="btnSync" class="sync-pill" onclick="sincronizarConSheets()">☁️ Al día</button>
+</header>
 
-    <label>URL de implementación Web App (Google Apps Script /exec)</label>
-    <input type="url" id="scriptUrl" placeholder="https://script.google.com/macros/s/.../exec" onchange="guardarConfig()">
+<div class="container">
 
-    <div class="row-2">
-      <div>
-        <label>Potrero / Lote</label>
-        <input type="text" id="loteNombre" value="Potrero 1" onchange="guardarConfig()">
+  <!-- SECCIÓN 1: MEDIR -->
+  <div id="sec-medir" class="section active">
+    <div id="gps-badge" style="padding:8px 12px; border-radius:10px; background:#eef5f0; border:1px solid #c7dfd0; font-size:0.85rem; font-weight:700; margin-bottom:12px;">
+      🛰️ GPS: iniciando...
+    </div>
+
+    <div class="card">
+      <h2>Transecta en Lote</h2>
+      <label>Potrero / Lote</label>
+      <div class="inline-select">
+        <select id="loteSelect" onchange="seleccionarLoteMedir()"></select>
+        <button class="btn-mini" onclick="toggleDrawer('drawerLoteMedir')">➕ Nuevo</button>
       </div>
-      <div>
-        <label>Distancia base 0 cm (cm)</label>
-        <input type="number" id="distBaseCm" value="80" step="1" onchange="guardarConfig()">
+
+      <div id="drawerLoteMedir" class="drawer-box">
+        <h3>Nuevo Potrero</h3>
+        <label>Nombre</label>
+        <input type="text" id="nuevoLoteNombre1" placeholder="Ej: Parcela 3 Alfalfa">
+        <div class="row-2">
+          <div><label>Superficie (ha)</label><input type="number" id="nuevoLoteHa1" step="0.1" placeholder="Ej: 12.5"></div>
+          <div><label>Remanente (kg MS)</label><input type="number" id="nuevoLoteRem1" step="50" value="1000"></div>
+        </div>
+        <div class="row-2">
+          <button class="btn btn-primary" onclick="crearLoteDesdeApp(1)">Guardar Lote</button>
+          <button class="btn btn-outline" onclick="toggleDrawer('drawerLoteMedir')">Cancelar</button>
+        </div>
+      </div>
+
+      <label>Curva Activa</label>
+      <select id="curvaSelect"></select>
+    </div>
+
+    <div class="card">
+      <button type="button" id="btnMedir" class="btn btn-accent" style="font-size: 1.08rem; padding: 16px; margin-bottom: 10px;" onclick="medirConCamara()">
+        📏 Medir (Cámara)
+      </button>
+      <video id="videoCam" autoplay playsinline muted></video>
+      <canvas id="canvasProc" style="display:none;"></canvas>
+      <div id="estadoCamara" style="font-size:0.82rem; color:var(--muted); margin-bottom:12px; text-align:center;">
+        Listo. Al tocar Medir calcula la distancia al plato y suma a la transecta.
+      </div>
+
+      <label>Distancia / Altura medida (cm)</label>
+      <div style="display:flex; gap:10px;">
+        <input type="number" id="alturaManual" step="0.1" placeholder="Se carga sola o escribí cm" style="margin-bottom:0;">
+        <button class="btn btn-primary" style="width:auto; padding:0 20px;" onclick="agregarMuestraManual()">➕ Sumar</button>
       </div>
     </div>
 
-    <div class="row-2">
-      <div>
-        <label>Diámetro plato (cm)</label>
-        <input type="number" id="diametroPlatoCm" value="35.6" step="0.1" onchange="guardarConfig()">
+    <div class="card">
+      <h2>Resumen</h2>
+      <div class="stats-grid">
+        <div class="stat-box"><div class="stat-value" id="statMuestras">0</div><div class="stat-label">MUESTRAS</div></div>
+        <div class="stat-box"><div class="stat-value" id="statAltura">0.0 cm</div><div class="stat-label">PROMEDIO CM</div></div>
+        <div class="stat-box" style="grid-column: span 2; background: #d8f3dc;"><div class="stat-value" id="statKgMs" style="font-size: 1.8rem;">0 kg MS/ha</div><div class="stat-label">DISPONIBILIDAD TOTAL</div></div>
       </div>
-      <div>
-        <label>Referencia 0 cm (px)</label>
-        <input type="number" id="diametro0Px" value="52" step="0.5" onchange="guardarConfig()">
+      <div class="sample-list" id="listaMuestras"></div>
+      <div style="display:flex; gap:10px; margin-top:12px;">
+        <button class="btn btn-primary" onclick="guardarTransecta()">💾 Guardar Lote</button>
+        <button class="btn btn-outline" onclick="limpiarTransecta()">🗑️ Reiniciar</button>
       </div>
-    </div>
-
-    <label>Distancia automática cargada (cm)</label>
-    <input type="number" id="distanciaCargadaCm" step="0.1" placeholder="Se carga automáticamente al tocar Medir" readonly>
-
-    <button id="btnMedir" class="btn-medir" onclick="medirDistanciaAutomatica()">📏 Medir</button>
-    <button id="btnCalibrar0" class="btn-sec" onclick="calibrarCeroAutomatico()">🎯 Calibrar 0 cm (plato en suelo pelado)</button>
-
-    <video id="videoCam" autoplay playsinline muted></video>
-    <canvas id="canvasProc" style="display:none;"></canvas>
-    <div id="estadoTxt" class="estado">Listo. Tocá Medir al avanzar por el campo.</div>
-
-    <div class="res-box">
-      <div class="res-dist" id="ultimaDistancia">-- cm</div>
-      <div class="res-sub" id="detalleLectura">Sin mediciones todavía</div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="stats">
-      <div class="stat">
-        <div class="stat-val" id="statCant">0</div>
-        <div class="stat-lbl">LECTURAS</div>
+  <!-- SECCIÓN 2: CALCULADORA -->
+  <div id="sec-pastoreo" class="section">
+    <div class="card">
+      <h2>Potrero y Rodeo</h2>
+      <label>Potrero / Lote</label>
+      <div class="inline-select">
+        <select id="calcLoteSelect" onchange="aplicarLoteCalculadora()"></select>
+        <button class="btn-mini" onclick="toggleDrawer('drawerLoteCalc')">➕ Lote</button>
       </div>
-      <div class="stat">
-        <div class="stat-val" id="statPromDist">0.0 cm</div>
-        <div class="stat-lbl">DISTANCIA PROM.</div>
+      <div id="drawerLoteCalc" class="drawer-box">
+        <h3>Crear Nuevo Lote</h3>
+        <label>Nombre</label><input type="text" id="nuevoLoteNombre2" placeholder="Ej: Franja Boyero Sur">
+        <div class="row-2">
+          <div><label>Hectáreas (ha)</label><input type="number" id="nuevoLoteHa2" step="0.1" placeholder="Ej: 4.5"></div>
+          <div><label>Remanente (kg MS)</label><input type="number" id="nuevoLoteRem2" step="50" value="1000"></div>
+        </div>
+        <div class="row-2">
+          <button class="btn btn-primary" onclick="crearLoteDesdeApp(2)">Guardar</button>
+          <button class="btn btn-outline" onclick="toggleDrawer('drawerLoteCalc')">Cerrar</button>
+        </div>
       </div>
+      <label>Rodeo / Tropa</label>
+      <div class="inline-select">
+        <select id="calcRodeoSelect" onchange="aplicarRodeoCalculadora()"></select>
+        <button class="btn-mini" onclick="toggleDrawer('drawerRodeoCalc')">➕ Rodeo</button>
+      </div>
+      <div id="drawerRodeoCalc" class="drawer-box">
+        <h3>Crear Nuevo Rodeo</h3>
+        <label>Nombre</label><input type="text" id="nuevoRodeoNombre" placeholder="Ej: Terneros Destete">
+        <div class="row-2">
+          <div><label>Cabezas</label><input type="number" id="nuevoRodeoCab" step="1" placeholder="Ej: 50"></div>
+          <div><label>Peso Vivo (kg)</label><input type="number" id="nuevoRodeoPeso" step="5" placeholder="Ej: 210"></div>
+        </div>
+        <label>Consumo Diario (% Peso Vivo)</label><input type="number" id="nuevoRodeoConsumo" step="0.1" value="2.8">
+        <div class="row-2">
+          <button class="btn btn-primary" onclick="crearRodeoDesdeApp()">Guardar Rodeo</button>
+          <button class="btn btn-outline" onclick="toggleDrawer('drawerRodeoCalc')">Cerrar</button>
+        </div>
+      </div>
+      <button class="btn btn-outline" style="margin-bottom:12px; padding:9px; font-size:0.85rem;" onclick="traerUltimaMedicion()">🔄 Traer disponibilidad</button>
+      <div class="row-2">
+        <div><label>Superficie (ha)</label><input type="number" id="calcHa" step="0.1" value="15" oninput="calcularPastoreo()"></div>
+        <div><label>Oferta Total (kg MS/ha)</label><input type="number" id="calcOferta" step="10" value="2400" oninput="calcularPastoreo()"></div>
+      </div>
+      <div class="row-2">
+        <div><label>Remanente (kg MS/ha)</label><input type="number" id="calcRemanente" step="50" value="1000" oninput="calcularPastoreo()"></div>
+        <div><label>Eficiencia Cosecha (%)</label><input type="number" id="calcEficiencia" step="5" value="70" oninput="calcularPastoreo()"></div>
+      </div>
+      <div class="row-2">
+        <div><label>Cantidad de Animales</label><input type="number" id="calcCabezas" step="1" value="45" oninput="calcularPastoreo()"></div>
+        <div><label>Peso Vivo Prom. (kg)</label><input type="number" id="calcPeso" step="5" value="380" oninput="calcularPastoreo()"></div>
+      </div>
+      <label>Consumo Diario (% del Peso Vivo)</label><input type="number" id="calcConsumoPct" step="0.1" value="2.8" oninput="calcularPastoreo()">
     </div>
-    <button class="btn-sec" onclick="reenviarPendientes()">☁️ Reenviar pendientes a Sheets (<span id="cantPend">0</span>)</button>
-    <div id="listaLecturas" class="lista" style="margin-top:10px;"></div>
+    <div class="card">
+      <h2>Resultado de Asignación</h2>
+      <div class="stats-grid">
+        <div class="stat-box" style="grid-column: span 2; background: #d8f3dc;"><div class="stat-value" id="resDias" style="font-size: 2.1rem;">0.0 días</div><div class="stat-label">PERMANENCIA ESTIMADA</div></div>
+        <div class="stat-box"><div class="stat-value" id="resForrajeNeto">0 kg</div><div class="stat-label">MS TOTAL</div></div>
+        <div class="stat-box"><div class="stat-value" id="resDemandaDiaria">0 kg/día</div><div class="stat-label">CONSUMO DIARIO</div></div>
+        <div class="stat-box" style="grid-column: span 2;"><div class="stat-value" id="resCarga" style="font-size: 1.15rem;">0 kg PV/ha</div><div class="stat-label">CARGA INSTANTÁNEA</div></div>
+      </div>
+      <button class="btn btn-primary" onclick="guardarCalculoPastoreo()">💾 Registrar Planificación</button>
+    </div>
   </div>
 
-  <script>
-    const STORAGE_KEY = 'pastagro_gh_estado_v1';
-    let estadoApp = {
-      scriptUrl: '',
-      lote: 'Potrero 1',
-      distBaseCm: 80,
-      diametroPlatoCm: 35.6,
-      diametro0Px: 52,
-      lecturas: []
-    };
-    let gpsActual = { lat: '', lng: '', acc: '' };
+  <!-- SECCIÓN 3: AJUSTES Y CURVAS -->
+  <div id="sec-curvas" class="section">
+    <div id="vistaCurvasPrincipal">
+      <div class="card">
+        <h2>Conexión con Google Apps Script (/exec)</h2>
+        <label>URL Web App de Google Apps Script</label>
+        <input type="url" id="gasUrlInput" placeholder="https://script.google.com/macros/s/.../exec" onchange="guardarGasUrl()">
+      </div>
 
-    function cargarEstado() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          estadoApp = Object.assign(estadoApp, parsed);
-        }
-      } catch (e) {}
+      <div class="curvas-banner">
+        <h2>🌿 Curvas de Calibración</h2>
+        <p>De centímetros a kg MS/ha</p>
+      </div>
 
-      document.getElementById('scriptUrl').value = estadoApp.scriptUrl || '';
-      document.getElementById('loteNombre').value = estadoApp.lote || 'Potrero 1';
-      document.getElementById('distBaseCm').value = estadoApp.distBaseCm || 80;
-      document.getElementById('diametroPlatoCm').value = estadoApp.diametroPlatoCm || 35.6;
-      document.getElementById('diametro0Px').value = estadoApp.diametro0Px || 52;
-      renderizarTodo();
-    }
-
-    function guardarConfig() {
-      estadoApp.scriptUrl = document.getElementById('scriptUrl').value.trim();
-      estadoApp.lote = document.getElementById('loteNombre').value.trim() || 'Lote';
-      estadoApp.distBaseCm = parseFloat(document.getElementById('distBaseCm').value) || 80;
-      estadoApp.diametroPlatoCm = parseFloat(document.getElementById('diametroPlatoCm').value) || 35.6;
-      estadoApp.diametro0Px = parseFloat(document.getElementById('diametro0Px').value) || 52;
-      persistirEstado();
-    }
-
-    function persistirEstado() {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(estadoApp));
-      } catch (e) {}
-    }
-
-    if ('geolocation' in navigator) {
-      navigator.geolocation.watchPosition(
-        (pos) => {
-          gpsActual = {
-            lat: Number(pos.coords.latitude.toFixed(6)),
-            lng: Number(pos.coords.longitude.toFixed(6)),
-            acc: Math.round(pos.coords.accuracy)
-          };
-        },
-        () => {},
-        { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
-      );
-    }
-
-    function detectarDiametroPx(video, canvas) {
-      if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return null;
-      const w = 160;
-      const h = Math.round((video.videoHeight / video.videoWidth) * w) || 120;
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      ctx.drawImage(video, 0, 0, w, h);
-      const d = ctx.getImageData(0, 0, w, h).data;
-
-      let sumBorde = 0, nBorde = 0;
-      for (let y = 0; y < h; y += 2) {
-        for (let x = 0; x < w; x += 2) {
-          if (x < w * 0.16 || x > w * 0.84 || y < h * 0.16 || y > h * 0.84) {
-            const i = (y * w + x) * 4;
-            sumBorde += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-            nBorde++;
-          }
-        }
-      }
-      const umbralClaro = Math.max(75, Math.min(238, (nBorde ? sumBorde / nBorde : 90) + 24));
-
-      let sumX = 0, sumY = 0, count = 0;
-      const pts = [];
-      for (let y = 4; y < h - 4; y += 2) {
-        for (let x = 4; x < w - 4; x += 2) {
-          const i = (y * w + x) * 4;
-          const r = d[i], g = d[i + 1], b = d[i + 2];
-          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-          const dif = Math.max(r, g, b) - Math.min(r, g, b);
-          if (lum >= umbralClaro && lum <= 250 && dif <= 55) {
-            sumX += x; sumY += y; count++;
-            pts.push([x, y]);
-          }
-        }
-      }
-      if (count < 20) return null;
-
-      const cx = sumX / count, cy = sumY / count;
-      let minX = w, maxX = 0, minY = h, maxY = 0, validos = 0;
-      for (const [px, py] of pts) {
-        if (Math.hypot(px - cx, py - cy) <= Math.min(w, h) * 0.46) {
-          validos++;
-          if (px < minX) minX = px;
-          if (px > maxX) maxX = px;
-          if (py < minY) minY = py;
-          if (py > maxY) maxY = py;
-        }
-      }
-      const ancho = maxX - minX, alto = maxY - minY;
-      if (validos < 20 || Math.max(ancho, alto) < 18) return null;
-      return (ancho + alto) / 2;
-    }
-
-    async function capturarDiametroPlato() {
-      const video = document.getElementById('videoCam');
-      const canvas = document.getElementById('canvasProc');
-      const estado = document.getElementById('estadoTxt');
-
-      if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
-        throw new Error('Este navegador no soporta cámara en vivo.');
-      }
-
-      estado.innerText = 'Abriendo cámara...';
-      let stream = null;
-
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 640 },
-            height: { ideal: 480 }
-          },
-          audio: false
-        });
-
-        video.srcObject = stream;
-        video.classList.add('activa');
-        await video.play();
-        estado.innerText = 'Midiendo distancia al plato automáticamente...';
-
-        const muestrasPx = [];
-        for (let i = 0; i < 28; i++) {
-          await new Promise(r => setTimeout(r, 70));
-          const medido = detectarDiametroPx(video, canvas);
-          if (medido !== null) {
-            muestrasPx.push(medido);
-            if (muestrasPx.length >= 3) break;
-          }
-        }
-
-        if (muestrasPx.length === 0) return null;
-        const promPx = muestrasPx.reduce((a, b) => a + b, 0) / muestrasPx.length;
-        return Math.round(promPx * 10) / 10;
-      } finally {
-        if (stream) {
-          stream.getTracks().forEach(t => {
-            try { t.stop(); } catch (e) {}
-          });
-        }
-        try { video.pause(); } catch (e) {}
-        video.srcObject = null;
-        video.classList.remove('activa');
-      }
-    }
-
-    async function calibrarCeroAutomatico() {
-      guardarConfig();
-      const btnMedir = document.getElementById('btnMedir');
-      const btnCal = document.getElementById('btnCalibrar0');
-      const estado = document.getElementById('estadoTxt');
-      btnMedir.disabled = true;
-      btnCal.disabled = true;
-
-      try {
-        const dPx = await capturarDiametroPlato();
-        if (!dPx) {
-          estado.innerText = 'No se detectó el plato en 0 cm. Acercá o centrá el plato.';
-          return;
-        }
-        estadoApp.diametro0Px = dPx;
-        document.getElementById('diametro0Px').value = dPx;
-        persistirEstado();
-        estado.innerText = `Referencia 0 cm calibrada en ${dPx} px.`;
-      } catch (err) {
-        estado.innerText = 'Error al calibrar: ' + (err.message || err);
-      } finally {
-        btnMedir.disabled = false;
-        btnCal.disabled = false;
-      }
-    }
-
-    async function enviarAGoogleSheet(payload) {
-      if (!estadoApp.scriptUrl) return false;
-      try {
-        await fetch(estadoApp.scriptUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(payload)
-        });
-        return true;
-      } catch (e) {
-        return false;
-      }
-    }
-
-    async function medirDistanciaAutomatica() {
-      guardarConfig();
-      const btnMedir = document.getElementById('btnMedir');
-      const btnCal = document.getElementById('btnCalibrar0');
-      const estado = document.getElementById('estadoTxt');
-      btnMedir.disabled = true;
-      btnCal.disabled = true;
-
-      try {
-        const dPx = await capturarDiametroPlato();
-        if (!dPx) {
-          estado.innerText = 'No se detectó el plato. Acercá un poco o revisá el encuadre.';
-          return;
-        }
-
-        const distBase = estadoApp.distBaseCm || 80;
-        const d0Px = estadoApp.diametro0Px || 52;
-        const distanciaCm = Math.round((distBase * (d0Px / Math.max(1, dPx))) * 10) / 10;
-        const alturaCm = Math.max(0, Math.round((distBase - distanciaCm) * 10) / 10);
-
-        document.getElementById('distanciaCargadaCm').value = distanciaCm;
-        document.getElementById('ultimaDistancia').innerText = `${distanciaCm} cm`;
-        document.getElementById('detalleLectura').innerText =
-          `Distancia automática: ${distanciaCm} cm · Altura pasto: ${alturaCm} cm (${dPx} px)`;
-
-        const registro = {
-          id: Date.now(),
-          tipo: 'lectura_distancia',
-          hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-          lote: estadoApp.lote,
-          distanciaCm,
-          alturaCm,
-          diametroPx: dPx,
-          lat: gpsActual.lat,
-          lng: gpsActual.lng,
-          acc: gpsActual.acc,
-          enviado: false
-        };
-
-        const enviado = await enviarAGoogleSheet(registro);
-        registro.enviado = enviado;
-
-        estadoApp.lecturas.unshift(registro);
-        persistirEstado();
-        renderizarTodo();
-
-        estado.innerText = enviado
-          ? `Cargado: ${distanciaCm} cm y enviado a Google Sheets.`
-          : `Cargado: ${distanciaCm} cm (guardado local para enviar a Sheets).`;
-      } catch (err) {
-        estado.innerText = 'No se pudo abrir la cámara: ' + (err.message || err);
-      } finally {
-        btnMedir.disabled = false;
-        btnCal.disabled = false;
-      }
-    }
-
-    async function reenviarPendientes() {
-      guardarConfig();
-      if (!estadoApp.scriptUrl) {
-        document.getElementById('estadoTxt').innerText = 'Pegá primero la URL /exec de Google Apps Script.';
-        return;
-      }
-      let enviadosAhora = 0;
-      for (const item of estadoApp.lecturas) {
-        if (!item.enviado) {
-          const ok = await enviarAGoogleSheet(item);
-          if (ok) {
-            item.enviado = true;
-            enviadosAhora++;
-          }
-        }
-      }
-      persistirEstado();
-      renderizarTodo();
-      document.getElementById('estadoTxt').innerText =
-        enviadosAhora > 0 ? `Se enviaron ${enviadosAhora} lecturas a Google Sheets.` : 'No había pendientes o falló el envío.';
-    }
-
-    function renderizarTodo() {
-      const total = estadoApp.lecturas.length;
-      const pend = estadoApp.lecturas.filter(x => !x.enviado).length;
-      const prom = total > 0
-        ? (estadoApp.lecturas.reduce((acc, x) => acc + (Number(x.distanciaCm) || 0), 0) / total).toFixed(1)
-        : '0.0';
-
-      document.getElementById('statCant').innerText = total;
-      document.getElementById('statPromDist').innerText = `${prom} cm`;
-      document.getElementById('cantPend').innerText = pend;
-
-      document.getElementById('listaLecturas').innerHTML = estadoApp.lecturas.map((x, idx) => `
-        <div class="item">
+      <div class="preset-trigger" onclick="togglePresets()">
+        <div class="preset-trigger-left">
+          <div class="preset-icon">📖</div>
           <div>
-            <strong>#${total - idx}</strong> · ${x.hora} · <small>${x.lote}</small>
-          </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <strong>${x.distanciaCm} cm</strong>
-            <span class="${x.enviado ? 'pill-ok' : 'pill-pend'}">${x.enviado ? 'Sheet' : 'Local'}</span>
+            <strong style="color:var(--primary); font-size:0.98rem;">Curvas base de PastAgro</strong>
+            <div style="font-size:0.8rem; color:var(--muted);">9 listas por pastura para empezar ya</div>
           </div>
         </div>
-      `).join('');
-    }
+        <span id="presetChevron" style="font-weight:800; color:var(--primary);">❯</span>
+      </div>
 
-    cargarEstado();
-  </script>
+      <div id="listaPresets" class="preset-list"></div>
+
+      <div class="card">
+        <label style="text-transform:uppercase; letter-spacing:0.5px; font-size:0.75rem; margin-bottom:10px;">Crear una curva tuya</label>
+        <div class="row-2">
+          <button class="btn btn-primary" onclick="iniciarNuevaCurva('plato')">📏 Con plato (35,6 cm)</button>
+          <button class="btn btn-outline" onclick="iniciarNuevaCurva('manual')">✏️ A mano</button>
+        </div>
+      </div>
+
+      <div id="bloqueBorradores" style="display:none; margin-bottom:14px;">
+        <label style="text-transform:uppercase; letter-spacing:0.5px; font-size:0.75rem; margin-bottom:8px;">En progreso (Pendientes de secado)</label>
+        <div id="listaBorradores"></div>
+      </div>
+
+      <div class="card">
+        <h2>Curvas Activas</h2>
+        <div id="listaCurvas"></div>
+      </div>
+
+      <div class="card">
+        <h2>Referencia de Cámara y Plato</h2>
+        <div class="row-2">
+          <div><label>Diámetro plato (cm)</label><input type="number" id="diametroPlatoReal" step="0.1" value="35.6"></div>
+          <div><label>Distancia base 0 cm (cm)</label><input type="number" id="distanciaCelularPlatoCm" step="1" value="80"></div>
+        </div>
+        <div class="row-2">
+          <div><label>Diámetro 0 cm (px)</label><input type="number" id="diametro0PxInput" step="0.5" value="52"></div>
+          <div><label>Calibración rápida</label><button type="button" class="btn btn-outline" style="padding:10px; font-size:0.85rem;" onclick="calibrarCeroCamara()">🎯 Calibrar 0 cm</button></div>
+        </div>
+        <button type="button" class="btn btn-primary" style="padding:11px; font-size:0.86rem;" onclick="guardarCalibracionVision()">Guardar Ajustes</button>
+      </div>
+
+      <div class="card">
+        <h2>Gestión de Lotes</h2><div id="listaLotesGestion"></div>
+      </div>
+      <div class="card">
+        <h2>Gestión de Rodeos</h2><div id="listaRodeosGestion"></div>
+      </div>
+    </div>
+
+    <div id="vistaEditorCurva" style="display:none;">
+      <button class="btn btn-outline" style="width:auto; padding:8px 14px; margin-bottom:12px; font-size:0.85rem;" onclick="volverListaCurvas()">
+        ‹ Volver a Curvas
+      </button>
+      <div class="card">
+        <h2 id="tituloEditorCurva">Nueva curva</h2>
+        <label style="text-transform:uppercase; font-size:0.74rem;">Nombre de la pastura</label>
+        <input type="text" id="editorCurvaNombre" placeholder="Ej: Cebadilla prueba" oninput="actualizarNombreBorrador()">
+        <div id="contenedorMuestrasCalibracion"></div>
+        <div class="row-2" style="margin-top:8px;">
+          <button class="btn btn-outline" style="padding:10px; font-size:0.88rem;" onclick="agregarMuestraCalibracion(null)">+ Manual</button>
+          <button class="btn btn-outline" style="padding:10px; font-size:0.88rem;" onclick="agregarMuestraCalibracion(0)">+ Fila vacía</button>
+        </div>
+        <div style="margin-top:12px; font-size:0.85rem; color:var(--muted);">
+          <div id="resumenMuestrasValidas">0/0 muestras válidas</div>
+          <div id="resumenPromedioMS" style="margin-top:4px; font-weight:700; color:var(--text);"></div>
+        </div>
+        <div id="cajaRegresion" class="regresion-box" style="display:none;"></div>
+        <div class="row-2" style="margin-top:14px;">
+          <button class="btn btn-outline" onclick="guardarBorradorCurva()">⏳ En progreso</button>
+          <button class="btn btn-primary" onclick="finalizarYPublicarCurva()">✅ Guardar curva</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 4: PENDIENTES -->
+  <div id="sec-historial" class="section">
+    <div class="card">
+      <h2>Cola Offline</h2><div id="listaHistorial"></div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 5: MAPA DE PUNTOS -->
+  <div id="sec-mapa" class="section">
+    <div class="card">
+      <h2>Mapa de Mediciones (GPS)</h2>
+      <label>Lote / Potrero</label>
+      <select id="filtroLoteMapa" onchange="poblarSelectRecorridasMapa()"></select>
+      <label>Recorrida / Fecha</label>
+      <select id="filtroRecorridaMapa" onchange="dibujarPuntosEnMapa()"></select>
+      <label>Vista del mapa</label>
+      <select id="capaBaseMapa" onchange="cambiarCapaBaseMapa()">
+        <option value="google_hybrid">Google Satélite + Etiquetas</option>
+        <option value="google_sat">Google Satélite puro</option>
+        <option value="esri_sat">Esri Satellite</option>
+        <option value="osm">OpenStreetMap</option>
+      </select>
+      <div id="mapaPastagro" style="height: 360px; width: 100%; border-radius: 12px; border: 1px solid var(--border); margin-top: 6px;"></div>
+    </div>
+  </div>
+
+</div>
+
+<div id="modalOverlay">
+  <div id="modalContainer">
+    <div id="modalTitle">🌱 PastAgro</div>
+    <div id="modalMessage">Mensaje aquí</div>
+    <div id="modalButtons">
+      <button id="modalBtnCancel" style="display:none;" onclick="cerrarModal(false)">Cancelar</button>
+      <button id="modalBtnOk" onclick="cerrarModal(true)">Aceptar</button>
+    </div>
+  </div>
+</div>
+
+<nav>
+  <button class="active" onclick="cambiarTab('medir', this)"><span>📏</span>Medir</button>
+  <button onclick="cambiarTab('pastoreo', this)"><span>🐄</span>Pastoreo</button>
+  <button onclick="cambiarTab('mapa', this)"><span>🗺️</span>Mapa</button>
+  <button onclick="cambiarTab('curvas', this)"><span>⚙️</span>Ajustes</button>
+  <button onclick="cambiarTab('historial', this)"><span>📋</span>Cola</button>
+</nav>
+
+<script>
+  const memoriaRespaldo = {};
+  function leerStorage(clave) {
+    try { return window.localStorage.getItem(clave); }
+    catch (e) { return Object.prototype.hasOwnProperty.call(memoriaRespaldo, clave) ? memoriaRespaldo[clave] : null; }
+  }
+  function guardarStorage(clave, valor) {
+    try { window.localStorage.setItem(clave, valor); }
+    catch (e) { memoriaRespaldo[clave] = String(valor); }
+  }
+  function borrarStorage(clave) {
+    try { window.localStorage.removeItem(clave); }
+    catch (e) { delete memoriaRespaldo[clave]; }
+  }
+  function leerJSONStorage(clave, fallback) {
+    try { const raw = leerStorage(clave); return raw ? JSON.parse(raw) : fallback; }
+    catch (e) { return fallback; }
+  }
+
+  let gasUrl = leerStorage('pastagro_gas_url') || '';
+  let diametroPlatoReal = parseFloat(leerStorage('pastagro_vision_diametro')) || 35.6;
+  let distanciaCelularPlatoCm = parseFloat(leerStorage('pastagro_distancia_plato_cm')) || 80;
+  let diametro0Px = parseFloat(leerStorage('pastagro_diametro_0_px')) || 52;
+
+  let ultimoGPS = { lat: null, lng: null, acc: null };
+  let mapaPastagro = null, capaPuntosMapa = null, capaBaseActual = null, recorridasMapa = [];
+
+  const curvasPredefinidas = [
+    { nombre: "Alfalfa pura (Primavera/Verano)", m: 171.2, b: 5, desc: "Alta densidad foliar" },
+    { nombre: "Alfalfa + Cebadilla + P. Ovillo", m: 158.4, b: 120, desc: "Consociada clásica" },
+    { nombre: "Raigrás anual (Vegetativo)", m: 145.0, b: 180, desc: "Macollaje denso" },
+    { nombre: "Cebadilla criolla", m: 138.5, b: 150, desc: "Porte semierecto" },
+    { nombre: "Agropiro alargado", m: 162.0, b: 240, desc: "Bajos alcalinos / alta fibra" },
+    { nombre: "Pastura polifítica perenne", m: 152.3, b: 160, desc: "Mezcla gramíneas y leguminosas" },
+    { nombre: "Festuca alta", m: 155.8, b: 210, desc: "Alta densidad basal" },
+    { nombre: "Avena / Verdeo de invierno", m: 132.0, b: 140, desc: "Encañazón temprana" },
+    { nombre: "Campo natural / Pastizal", m: 140.0, b: 280, desc: "Tapiz mixto natural" }
+  ];
+
+  const curvasBase = [{ id: 1, nombre: "Alfalfa + Cebadilla + P. Ovillo", m: 158.4, b: 120 }];
+  let curvas = leerJSONStorage('pastagro_curvas', curvasBase);
+  let borradoresCurvas = leerJSONStorage('pastagro_borradores_curvas', []);
+  let lotes = leerJSONStorage('pastagro_lotes', []);
+  let rodeos = leerJSONStorage('pastagro_rodeos', []);
+  let muestrasActuales = leerJSONStorage('pastagro_muestras', []);
+  let historial = leerJSONStorage('pastagro_historial', []);
+  let borradorActivo = null, modalCallback = null;
+
+  function mostrarAlerta(mensaje, titulo = "🌱 PastAgro") {
+    document.getElementById('modalTitle').innerText = titulo;
+    document.getElementById('modalMessage').innerText = mensaje;
+    document.getElementById('modalBtnCancel').style.display = 'none';
+    document.getElementById('modalBtnOk').innerText = 'Aceptar';
+    document.getElementById('modalOverlay').style.display = 'flex';
+    modalCallback = null;
+  }
+
+  function mostrarConfirmacion(mensaje, callback, titulo = "🌱 Confirmar acción", textoOk = "Aceptar") {
+    document.getElementById('modalTitle').innerText = titulo;
+    document.getElementById('modalMessage').innerText = mensaje;
+    document.getElementById('modalBtnCancel').style.display = 'block';
+    document.getElementById('modalBtnOk').innerText = textoOk;
+    document.getElementById('modalOverlay').style.display = 'flex';
+    modalCallback = callback;
+  }
+
+  function cerrarModal(confirmado) {
+    document.getElementById('modalOverlay').style.display = 'none';
+    if (modalCallback) { const cb = modalCallback; modalCallback = null; cb(confirmado); }
+  }
+
+  function iniciarGPS() {
+    const badge = document.getElementById('gps-badge');
+    if (!badge || !('geolocation' in navigator)) return;
+    navigator.geolocation.watchPosition(
+      (pos) => {
+        ultimoGPS = { lat: Number(pos.coords.latitude.toFixed(6)), lng: Number(pos.coords.longitude.toFixed(6)), acc: Math.round(pos.coords.accuracy) };
+        badge.innerText = `🛰️ GPS listo (±${ultimoGPS.acc} m)`;
+        badge.style.background = ultimoGPS.acc <= 12 ? '#d8f3dc' : '#fff9eb';
+      },
+      () => { badge.innerText = "🛰️ GPS en espera"; },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+    );
+  }
+
+  window.onload = function() {
+    document.getElementById('gasUrlInput').value = gasUrl;
+    document.getElementById('diametroPlatoReal').value = diametroPlatoReal;
+    document.getElementById('distanciaCelularPlatoCm').value = distanciaCelularPlatoCm;
+    document.getElementById('diametro0PxInput').value = diametro0Px;
+    iniciarGPS();
+    poblarSelectores();
+    aplicarLoteCalculadora();
+    aplicarRodeoCalculadora();
+    actualizarResumen();
+    actualizarEstadoSync();
+    calcularPastoreo();
+    renderPresets();
+    renderBorradores();
+    renderCurvas();
+    renderLotesRodeosGestion();
+  };
+
+  function guardarGasUrl() {
+    gasUrl = document.getElementById('gasUrlInput').value.trim();
+    guardarStorage('pastagro_gas_url', gasUrl);
+  }
+
+  function guardarCalibracionVision() {
+    diametroPlatoReal = parseFloat(document.getElementById('diametroPlatoReal').value) || 35.6;
+    distanciaCelularPlatoCm = parseFloat(document.getElementById('distanciaCelularPlatoCm').value) || 80;
+    diametro0Px = parseFloat(document.getElementById('diametro0PxInput').value) || 52;
+    guardarStorage('pastagro_vision_diametro', diametroPlatoReal);
+    guardarStorage('pastagro_distancia_plato_cm', distanciaCelularPlatoCm);
+    guardarStorage('pastagro_diametro_0_px', diametro0Px);
+    mostrarAlerta("Ajustes guardados.");
+  }
+
+  function detectarDiametroPx(video, canvas) {
+    if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return null;
+    const w = 160;
+    const h = Math.round((video.videoHeight / video.videoWidth) * w) || 120;
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(video, 0, 0, w, h);
+    const d = ctx.getImageData(0, 0, w, h).data;
+
+    let sumBorde = 0, nBorde = 0;
+    for (let y = 0; y < h; y += 2) {
+      for (let x = 0; x < w; x += 2) {
+        if (x < w * 0.16 || x > w * 0.84 || y < h * 0.16 || y > h * 0.84) {
+          const i = (y * w + x) * 4;
+          sumBorde += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+          nBorde++;
+        }
+      }
+    }
+    const umbralClaro = Math.max(75, Math.min(238, (nBorde ? sumBorde / nBorde : 90) + 24));
+    let sumX = 0, sumY = 0, count = 0;
+    const pts = [];
+    for (let y = 4; y < h - 4; y += 2) {
+      for (let x = 4; x < w - 4; x += 2) {
+        const i = (y * w + x) * 4;
+        const r = d[i], g = d[i + 1], b = d[i + 2];
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        const dif = Math.max(r, g, b) - Math.min(r, g, b);
+        if (lum >= umbralClaro && lum <= 250 && dif <= 55) {
+          sumX += x; sumY += y; count++; pts.push([x, y]);
+        }
+      }
+    }
+    if (count < 20) return null;
+    const cx = sumX / count, cy = sumY / count;
+    let minX = w, maxX = 0, minY = h, maxY = 0, validos = 0;
+    for (const [px, py] of pts) {
+      if (Math.hypot(px - cx, py - cy) <= Math.min(w, h) * 0.46) {
+        validos++;
+        if (px < minX) minX = px; if (px > maxX) maxX = px;
+        if (py < minY) minY = py; if (py > maxY) maxY = py;
+      }
+    }
+    const ancho = maxX - minX, alto = maxY - minY;
+    if (validos < 20 || Math.max(ancho, alto) < 18) return null;
+    return (ancho + alto) / 2;
+  }
+
+  async function capturarDiametroCamara() {
+    const video = document.getElementById('videoCam');
+    const canvas = document.getElementById('canvasProc');
+    const estado = document.getElementById('estadoCamara');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error("Cámara no disponible en este navegador.");
+    }
+    estado.innerText = "Abriendo cámara...";
+    let stream = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false
+      });
+      video.srcObject = stream;
+      video.classList.add('activa');
+      await video.play();
+      estado.innerText = "Detectando plato...";
+      const muestrasPx = [];
+      for (let i = 0; i < 25; i++) {
+        await new Promise(r => setTimeout(r, 70));
+        const px = detectarDiametroPx(video, canvas);
+        if (px !== null) { muestrasPx.push(px); if (muestrasPx.length >= 3) break; }
+      }
+      if (!muestrasPx.length) return null;
+      return Math.round((muestrasPx.reduce((a, b) => a + b, 0) / muestrasPx.length) * 10) / 10;
+    } finally {
+      if (stream) stream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
+      try { video.pause(); } catch (e) {}
+      video.srcObject = null;
+      video.classList.remove('activa');
+    }
+  }
+
+  async function calibrarCeroCamara() {
+    try {
+      const px = await capturarDiametroCamara();
+      if (!px) { mostrarAlerta("No se detectó el plato en 0 cm."); return; }
+      diametro0Px = px;
+      document.getElementById('diametro0PxInput').value = px;
+      guardarStorage('pastagro_diametro_0_px', px);
+      mostrarAlerta(`Referencia 0 cm calibrada en ${px} px.`);
+    } catch (e) { mostrarAlerta("No se pudo abrir la cámara: " + (e.message || e)); }
+  }
+
+  async function medirConCamara() {
+    const btn = document.getElementById('btnMedir');
+    const estado = document.getElementById('estadoCamara');
+    btn.disabled = true;
+    try {
+      const px = await capturarDiametroCamara();
+      if (!px) {
+        estado.innerText = "No se detectó el plato. Acercá o ingresá cm manualmente.";
+        return;
+      }
+      const distanciaCm = Math.round((distanciaCelularPlatoCm * (diametro0Px / Math.max(1, px))) * 10) / 10;
+      const alturaCm = Math.max(0, Math.round((distanciaCelularPlatoCm - distanciaCm) * 10) / 10);
+      document.getElementById('alturaManual').value = distanciaCm;
+      registrarMuestra(distanciaCm);
+      estado.innerText = `Distancia cargada: ${distanciaCm} cm (altura pasto: ${alturaCm} cm)`;
+    } catch (e) {
+      estado.innerText = "Error de cámara: " + (e.message || e);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function togglePresets() {
+    const lista = document.getElementById('listaPresets');
+    lista.classList.toggle('open');
+    document.getElementById('presetChevron').innerText = lista.classList.contains('open') ? '⌄' : '❯';
+  }
+
+  function renderPresets() {
+    document.getElementById('listaPresets').innerHTML = curvasPredefinidas.map((p, idx) => `
+      <div class="preset-card">
+        <div><strong>${p.nombre}</strong><br><small style="color:var(--muted);">${p.desc}</small></div>
+        <button class="btn-mini" style="padding:8px 12px;" onclick="usarCurvaPredefinida(${idx})">+ Agregar</button>
+      </div>
+    `).join('');
+  }
+
+  function usarCurvaPredefinida(idx) {
+    const p = curvasPredefinidas[idx];
+    if (curvas.some(c => c.nombre === p.nombre)) { mostrarAlerta("Ya está en Curvas Activas."); return; }
+    curvas.push({ id: Date.now(), nombre: p.nombre, m: p.m, b: p.b });
+    guardarStorage('pastagro_curvas', JSON.stringify(curvas));
+    poblarSelectores(); renderCurvas();
+    mostrarAlerta(`Curva "${p.nombre}" agregada.`);
+  }
+
+  function iniciarNuevaCurva(modo) {
+    const hoy = new Date();
+    borradorActivo = { id: Date.now(), nombre: `Pastura ${hoy.getDate()}/${hoy.getMonth() + 1}`, muestras: [{ cm: '', fresco: '', seco: '' }] };
+    document.getElementById('vistaCurvasPrincipal').style.display = 'none';
+    document.getElementById('vistaEditorCurva').style.display = 'block';
+    document.getElementById('editorCurvaNombre').value = borradorActivo.nombre;
+    renderMuestrasCalibracion();
+  }
+
+  function abrirBorrador(id) {
+    const found = borradoresCurvas.find(b => b.id == id);
+    if (!found) return;
+    borradorActivo = JSON.parse(JSON.stringify(found));
+    document.getElementById('vistaCurvasPrincipal').style.display = 'none';
+    document.getElementById('vistaEditorCurva').style.display = 'block';
+    document.getElementById('editorCurvaNombre').value = borradorActivo.nombre;
+    renderMuestrasCalibracion();
+  }
+
+  function volverListaCurvas() {
+    if (borradorActivo && borradorActivo.muestras.length > 0) persistirBorradorLocal(false);
+    document.getElementById('vistaEditorCurva').style.display = 'none';
+    document.getElementById('vistaCurvasPrincipal').style.display = 'block';
+    renderBorradores(); renderCurvas();
+  }
+
+  function actualizarNombreBorrador() { if (borradorActivo) borradorActivo.nombre = document.getElementById('editorCurvaNombre').value; }
+  function agregarMuestraCalibracion(val) { if (!borradorActivo) return; borradorActivo.muestras.push({ cm: val !== null ? val : '', fresco: '', seco: '' }); renderMuestrasCalibracion(); }
+  function eliminarMuestraCalibracion(idx) { borradorActivo.muestras.splice(idx, 1); renderMuestrasCalibracion(); }
+  function actualizarCampoMuestra(idx, campo, valor) { borradorActivo.muestras[idx][campo] = valor; recalcularEstadisticasCurva(); }
+  function calcularKgHaDesdeSeco(secoG) {
+    const r = (diametroPlatoReal / 100) / 2;
+    return Math.round((secoG / (Math.PI * r * r)) * 10);
+  }
+
+  function renderMuestrasCalibracion() {
+    const cont = document.getElementById('contenedorMuestrasCalibracion');
+    cont.innerHTML = borradorActivo.muestras.map((m, idx) => {
+      const cm = parseFloat(m.cm), fresco = parseFloat(m.fresco), seco = parseFloat(m.seco);
+      const esValida = !isNaN(cm) && cm > 0 && !isNaN(seco) && seco > 0;
+      let infoLinea = "Completá cm y peso seco (g)";
+      if (!isNaN(seco) && seco > 0) {
+        const kgHa = calcularKgHaDesdeSeco(seco);
+        infoLinea = (!isNaN(fresco) && fresco >= seco && fresco > 0)
+          ? `${((seco / fresco) * 100).toFixed(1)}% MS · ${kgHa.toLocaleString('es-AR')} kg MS/ha`
+          : `${kgHa.toLocaleString('es-AR')} kg MS/ha`;
+      }
+      return `
+        <div class="muestra-cal-card ${esValida ? 'valida' : ''}" id="cardMuestra_${idx}">
+          <div class="muestra-cal-top">
+            <div class="muestra-cal-cm">
+              <strong>${idx + 1}</strong>
+              <input type="number" step="0.1" value="${m.cm}" oninput="actualizarCampoMuestra(${idx}, 'cm', this.value)">
+              <span>cm</span>
+            </div>
+            <button class="btn btn-danger" onclick="eliminarMuestraCalibracion(${idx})">✕</button>
+          </div>
+          <div class="row-2">
+            <div><label>Fresco (g)</label><input type="number" step="0.1" value="${m.fresco}" oninput="actualizarCampoMuestra(${idx}, 'fresco', this.value)"></div>
+            <div><label>Seco (g)</label><input type="number" step="0.01" value="${m.seco}" oninput="actualizarCampoMuestra(${idx}, 'seco', this.value)"></div>
+          </div>
+          <div class="muestra-cal-res" id="resMuestra_${idx}">${infoLinea}</div>
+        </div>`;
+    }).join('');
+    recalcularEstadisticasCurva();
+  }
+
+  function calcularRegresionLineal(puntos) {
+    const n = puntos.length;
+    if (n < 2) return null;
+    let sx = 0, sy = 0, sxy = 0, sxx = 0, syy = 0;
+    for (const p of puntos) { sx += p.x; sy += p.y; sxy += p.x * p.y; sxx += p.x * p.x; syy += p.y * p.y; }
+    const denom = (n * sxx) - (sx * sx);
+    if (Math.abs(denom) < 1e-9) return null;
+    const m = ((n * sxy) - (sx * sy)) / denom;
+    const b = (sy - (m * sx)) / n;
+    const denR = Math.sqrt(denom * ((n * syy) - (sy * sy)));
+    const r2 = denR > 0 ? Math.pow(((n * sxy) - (sx * sy)) / denR, 2) : 0;
+    return { m: Math.round(m * 10) / 10, b: Math.round(b), r2: Math.round(r2 * 100) / 100 };
+  }
+
+  function recalcularEstadisticasCurva() {
+    const puntosValidos = [];
+    borradorActivo.muestras.forEach((m, idx) => {
+      const cm = parseFloat(m.cm), fresco = parseFloat(m.fresco), seco = parseFloat(m.seco);
+      const esValida = !isNaN(cm) && cm > 0 && !isNaN(seco) && seco > 0;
+      const card = document.getElementById(`cardMuestra_${idx}`);
+      const resEl = document.getElementById(`resMuestra_${idx}`);
+      if (card) card.classList.toggle('valida', esValida);
+      if (!isNaN(seco) && seco > 0) {
+        const kgHa = calcularKgHaDesdeSeco(seco);
+        if (esValida) puntosValidos.push({ x: cm, y: kgHa });
+        if (resEl) resEl.innerText = (!isNaN(fresco) && fresco >= seco && fresco > 0)
+          ? `${((seco / fresco) * 100).toFixed(1)}% MS · ${kgHa.toLocaleString('es-AR')} kg MS/ha`
+          : `${kgHa.toLocaleString('es-AR')} kg MS/ha`;
+      }
+    });
+    document.getElementById('resumenMuestrasValidas').innerText = `${puntosValidos.length}/${borradorActivo.muestras.length} muestras válidas`;
+    const regBox = document.getElementById('cajaRegresion');
+    const reg = calcularRegresionLineal(puntosValidos);
+    if (reg) {
+      regBox.style.display = 'block';
+      regBox.innerHTML = `<strong>📐 Ecuación:</strong> y = ${reg.m} · cm + ${reg.b} (R² = ${reg.r2})`;
+    } else { regBox.style.display = 'none'; }
+  }
+
+  function persistirBorradorLocal(notificar) {
+    borradorActivo.nombre = document.getElementById('editorCurvaNombre').value.trim() || "Curva sin nombre";
+    const idx = borradoresCurvas.findIndex(b => b.id == borradorActivo.id);
+    if (idx >= 0) borradoresCurvas[idx] = borradorActivo; else borradoresCurvas.unshift(borradorActivo);
+    guardarStorage('pastagro_borradores_curvas', JSON.stringify(borradoresCurvas));
+    if (notificar) { mostrarAlerta("Guardada en progreso."); volverListaCurvas(); }
+  }
+
+  function guardarBorradorCurva() { if (!borradorActivo || !borradorActivo.muestras.length) { mostrarAlerta("Cargá al menos una muestra."); return; } persistirBorradorLocal(true); }
+
+  function eliminarBorrador(ev, id) {
+    ev.stopPropagation();
+    borradoresCurvas = borradoresCurvas.filter(b => b.id != id);
+    guardarStorage('pastagro_borradores_curvas', JSON.stringify(borradoresCurvas));
+    renderBorradores();
+  }
+
+  function renderBorradores() {
+    const bloque = document.getElementById('bloqueBorradores');
+    if (!borradoresCurvas.length) { bloque.style.display = 'none'; return; }
+    bloque.style.display = 'block';
+    document.getElementById('listaBorradores').innerHTML = borradoresCurvas.map(b => `
+      <div class="draft-card" onclick="abrirBorrador(${b.id})">
+        <button class="draft-close" onclick="eliminarBorrador(event, ${b.id})">✕</button>
+        <div class="draft-badge">EN PROGRESO</div>
+        <div class="draft-title">${b.nombre}</div>
+        <div class="draft-sub">${b.muestras.length} mediciones</div>
+      </div>`).join('');
+  }
+
+  function finalizarYPublicarCurva() {
+    const nombre = document.getElementById('editorCurvaNombre').value.trim();
+    if (!nombre) { mostrarAlerta("Escribí un nombre."); return; }
+    const puntos = borradorActivo.muestras.map(m => ({ x: parseFloat(m.cm), y: calcularKgHaDesdeSeco(parseFloat(m.seco)) }))
+      .filter(p => !isNaN(p.x) && p.x > 0 && !isNaN(p.y) && p.y > 0);
+    const reg = calcularRegresionLineal(puntos);
+    if (!reg || reg.m <= 0) { mostrarAlerta("Necesitás al menos 2 muestras válidas."); return; }
+    curvas.push({ id: Date.now(), nombre, m: reg.m, b: reg.b });
+    guardarStorage('pastagro_curvas', JSON.stringify(curvas));
+    borradoresCurvas = borradoresCurvas.filter(b => b.id != borradorActivo.id);
+    guardarStorage('pastagro_borradores_curvas', JSON.stringify(borradoresCurvas));
+    borradorActivo = null;
+    poblarSelectores(); volverListaCurvas();
+    mostrarAlerta(`Curva "${nombre}" activada.`);
+  }
+
+  function eliminarCurva(id) {
+    if (curvas.length <= 1) { mostrarAlerta("Debe quedar al menos una curva activa."); return; }
+    curvas = curvas.filter(c => c.id != id);
+    guardarStorage('pastagro_curvas', JSON.stringify(curvas));
+    poblarSelectores(); renderCurvas();
+  }
+
+  function renderCurvas() {
+    document.getElementById('listaCurvas').innerHTML = curvas.map(c => `
+      <div class="sample-item">
+        <div><strong>${c.nombre}</strong><br><small style="color:var(--muted)">y = ${c.m} · cm + ${c.b}</small></div>
+        <button class="btn btn-danger" onclick="eliminarCurva(${c.id})">Borrar</button>
+      </div>`).join('');
+  }
+
+  function toggleDrawer(id) { document.getElementById(id).classList.toggle('open'); }
+
+  function poblarSelectores() {
+    document.getElementById('curvaSelect').innerHTML = curvas.map(c => `<option value="${c.id}">${c.nombre} (y=${c.m}x+${c.b})</option>`).join('');
+    const opLotes = lotes.length ? lotes.map((l, idx) => `<option value="${idx}">${l.nombre} (${l.ha} ha)</option>`).join('') : `<option value="">Sin lotes cargados</option>`;
+    document.getElementById('loteSelect').innerHTML = opLotes;
+    document.getElementById('calcLoteSelect').innerHTML = opLotes;
+    const opRodeos = rodeos.length ? rodeos.map((r, idx) => `<option value="${idx}">${r.nombre} (${r.cabezas} cab)</option>`).join('') : `<option value="">Sin rodeos cargados</option>`;
+    document.getElementById('calcRodeoSelect').innerHTML = opRodeos;
+  }
+
+  function crearLoteDesdeApp(origen) {
+    const nombre = document.getElementById('nuevoLoteNombre' + origen).value.trim();
+    const ha = parseFloat(document.getElementById('nuevoLoteHa' + origen).value);
+    const remanente = parseFloat(document.getElementById('nuevoLoteRem' + origen).value) || 1000;
+    if (!nombre || isNaN(ha) || ha <= 0) { mostrarAlerta("Ingresá nombre y hectáreas válidas."); return; }
+    lotes.push({ nombre, ha, remanente, sincronizado: false });
+    guardarStorage('pastagro_lotes', JSON.stringify(lotes));
+    poblarSelectores(); renderLotesRodeosGestion();
+    document.getElementById('nuevoLoteNombre' + origen).value = '';
+    document.getElementById('nuevoLoteHa' + origen).value = '';
+    toggleDrawer(origen === 1 ? 'drawerLoteMedir' : 'drawerLoteCalc');
+    mostrarAlerta("Lote creado.");
+  }
+
+  function eliminarLote(idx) {
+    lotes.splice(idx, 1);
+    guardarStorage('pastagro_lotes', JSON.stringify(lotes));
+    poblarSelectores(); renderLotesRodeosGestion(); aplicarLoteCalculadora();
+  }
+
+  function crearRodeoDesdeApp() {
+    const nombre = document.getElementById('nuevoRodeoNombre').value.trim();
+    const cabezas = parseInt(document.getElementById('nuevoRodeoCab').value);
+    const peso = parseFloat(document.getElementById('nuevoRodeoPeso').value);
+    const consumo = parseFloat(document.getElementById('nuevoRodeoConsumo').value) || 2.8;
+    if (!nombre || isNaN(cabezas) || isNaN(peso)) { mostrarAlerta("Completá nombre, cabezas y peso."); return; }
+    rodeos.push({ nombre, cabezas, peso, consumo, sincronizado: false });
+    guardarStorage('pastagro_rodeos', JSON.stringify(rodeos));
+    poblarSelectores(); renderLotesRodeosGestion();
+    document.getElementById('nuevoRodeoNombre').value = '';
+    document.getElementById('nuevoRodeoCab').value = '';
+    document.getElementById('nuevoRodeoPeso').value = '';
+    toggleDrawer('drawerRodeoCalc');
+    mostrarAlerta("Rodeo guardado.");
+  }
+
+  function eliminarRodeo(idx) {
+    rodeos.splice(idx, 1);
+    guardarStorage('pastagro_rodeos', JSON.stringify(rodeos));
+    poblarSelectores(); renderLotesRodeosGestion(); aplicarRodeoCalculadora();
+  }
+
+  function renderLotesRodeosGestion() {
+    document.getElementById('listaLotesGestion').innerHTML = lotes.length
+      ? lotes.map((l, idx) => `<div class="sample-item"><div><strong>${l.nombre}</strong><br><small style="color:var(--muted)">${l.ha} ha | Rem: ${l.remanente} kg MS</small></div><button class="btn btn-danger" onclick="eliminarLote(${idx})">🗑️</button></div>`).join('')
+      : "<p style='color:var(--muted); font-size:0.85rem;'>Sin lotes cargados.</p>";
+    document.getElementById('listaRodeosGestion').innerHTML = rodeos.length
+      ? rodeos.map((r, idx) => `<div class="sample-item"><div><strong>${r.nombre}</strong><br><small style="color:var(--muted)">${r.cabezas} cab | ${r.peso} kg</small></div><button class="btn btn-danger" onclick="eliminarRodeo(${idx})">🗑️</button></div>`).join('')
+      : "<p style='color:var(--muted); font-size:0.85rem;'>Sin rodeos cargados.</p>";
+  }
+
+  function seleccionarLoteMedir() {
+    document.getElementById('calcLoteSelect').value = document.getElementById('loteSelect').value;
+    aplicarLoteCalculadora();
+  }
+
+  function aplicarLoteCalculadora() {
+    const lote = lotes[document.getElementById('calcLoteSelect').value];
+    document.getElementById('calcHa').value = lote ? lote.ha : 0;
+    document.getElementById('calcRemanente').value = lote ? lote.remanente : 0;
+    calcularPastoreo();
+  }
+
+  function aplicarRodeoCalculadora() {
+    const rodeo = rodeos[document.getElementById('calcRodeoSelect').value];
+    document.getElementById('calcCabezas').value = rodeo ? rodeo.cabezas : 0;
+    document.getElementById('calcPeso').value = rodeo ? rodeo.peso : 0;
+    if (rodeo) document.getElementById('calcConsumoPct').value = rodeo.consumo;
+    calcularPastoreo();
+  }
+
+  function cambiarTab(tab, btn) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    document.getElementById('sec-' + tab).classList.add('active');
+    btn.classList.add('active');
+    if (tab === 'pastoreo') calcularPastoreo();
+    if (tab === 'mapa') cargarMapaMediciones();
+    if (tab === 'curvas') { renderBorradores(); renderCurvas(); renderLotesRodeosGestion(); }
+    if (tab === 'historial') renderHistorial();
+  }
+
+  function traerUltimaMedicion() {
+    if (muestrasActuales.length > 0) {
+      const promKg = Math.round(muestrasActuales.reduce((a, b) => a + b.kgMs, 0) / muestrasActuales.length);
+      document.getElementById('calcOferta').value = promKg; calcularPastoreo();
+      mostrarAlerta(`Cargado promedio actual: ${promKg} kg MS/ha`); return;
+    }
+    if (historial.length > 0) {
+      document.getElementById('calcOferta').value = historial[0].promKg; calcularPastoreo();
+      mostrarAlerta(`Cargado último lote: ${historial[0].promKg} kg MS/ha`); return;
+    }
+    mostrarAlerta("No hay mediciones registradas todavía.");
+  }
+
+  function calcularPastoreo() {
+    const ha = parseFloat(document.getElementById('calcHa').value) || 0,
+          oferta = parseFloat(document.getElementById('calcOferta').value) || 0,
+          remanente = parseFloat(document.getElementById('calcRemanente').value) || 0,
+          eficiencia = (parseFloat(document.getElementById('calcEficiencia').value) || 0) / 100,
+          cabezas = parseFloat(document.getElementById('calcCabezas').value) || 0,
+          peso = parseFloat(document.getElementById('calcPeso').value) || 0,
+          consumoPct = (parseFloat(document.getElementById('calcConsumoPct').value) || 0) / 100;
+    const forrajeTotal = Math.round(Math.max(0, (oferta - remanente) * eficiencia) * ha),
+          demandaDiaria = cabezas * peso * consumoPct,
+          dias = demandaDiaria > 0 ? (forrajeTotal / demandaDiaria) : 0,
+          cargaKgHa = ha > 0 ? Math.round((cabezas * peso) / ha) : 0;
+    document.getElementById('resDias').innerText = dias.toFixed(1) + " días";
+    document.getElementById('resForrajeNeto').innerText = forrajeTotal.toLocaleString('es-AR') + " kg MS";
+    document.getElementById('resDemandaDiaria').innerText = Math.round(demandaDiaria).toLocaleString('es-AR') + " kg/día";
+    document.getElementById('resCarga').innerText = `${cargaKgHa.toLocaleString('es-AR')} kg PV/ha`;
+    return { ha, cab: cabezas, pes: peso, total: forrajeTotal, dias: dias.toFixed(1) };
+  }
+
+  function guardarCalculoPastoreo() {
+    const d = calcularPastoreo();
+    const lote = lotes[document.getElementById('calcLoteSelect').value]?.nombre || "Lote";
+    if (!gasUrl) { mostrarAlerta(`Resultado: ${d.dias} días. Configurá la URL /exec en Ajustes para enviar a Sheets.`); return; }
+    fetch(gasUrl, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ tipo: 'pastoreo', fecha: new Date().toLocaleDateString('es-AR'), lote, hectareas: d.ha, cabezas: d.cab, pesoVivo: d.pes, forrajeAprovechableTotal: d.total, dias: d.dias }) })
+      .then(() => mostrarAlerta("Planificación enviada a Google Sheets."))
+      .catch(() => mostrarAlerta("Sin conexión para enviar."));
+  }
+
+  function agregarMuestraManual() {
+    const val = parseFloat(document.getElementById('alturaManual').value);
+    if (isNaN(val) || val < 0) { mostrarAlerta("Ingresá un valor en cm válido."); return; }
+    registrarMuestra(val);
+    document.getElementById('alturaManual').value = '';
+  }
+
+  function registrarMuestra(cm) {
+    const curva = curvas.find(c => c.id == parseInt(document.getElementById('curvaSelect').value)) || curvas[0];
+    const kgMs = Math.max(0, Math.round((curva.m * cm) + curva.b));
+    muestrasActuales.push({ id: Date.now(), cm, kgMs, lat: ultimoGPS.lat, lng: ultimoGPS.lng, acc: ultimoGPS.acc, hora: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+    guardarStorage('pastagro_muestras', JSON.stringify(muestrasActuales));
+    actualizarResumen(); calcularPastoreo();
+  }
+
+  function borrarMuestra(id) {
+    muestrasActuales = muestrasActuales.filter(m => m.id !== id);
+    guardarStorage('pastagro_muestras', JSON.stringify(muestrasActuales));
+    actualizarResumen(); calcularPastoreo();
+  }
+
+  function actualizarResumen() {
+    const total = muestrasActuales.length;
+    document.getElementById('statMuestras').innerText = total;
+    if (!total) {
+      document.getElementById('statAltura').innerText = "0.0 cm";
+      document.getElementById('statKgMs').innerText = "0 kg MS/ha";
+      document.getElementById('listaMuestras').innerHTML = "<p style='padding:10px; color:var(--muted); text-align:center; font-size:0.85rem;'>Sin muestras aún.</p>";
+      return;
+    }
+    const promCm = (muestrasActuales.reduce((a, b) => a + b.cm, 0) / total).toFixed(1);
+    const promKg = Math.round(muestrasActuales.reduce((a, b) => a + b.kgMs, 0) / total);
+    document.getElementById('calcOferta').value = promKg;
+    document.getElementById('statAltura').innerText = promCm + " cm";
+    document.getElementById('statKgMs').innerText = promKg.toLocaleString('es-AR') + " kg MS/ha";
+    document.getElementById('listaMuestras').innerHTML = muestrasActuales.slice().reverse().map((m, idx) => `<div class="sample-item"><span><strong>#${total - idx}</strong> — ${m.cm} cm → <strong>${m.kgMs} kg MS/ha</strong></span><button class="btn btn-danger" onclick="borrarMuestra(${m.id})">✕</button></div>`).join('');
+  }
+
+  function limpiarTransecta() {
+    muestrasActuales = []; borrarStorage('pastagro_muestras'); actualizarResumen();
+  }
+
+  function guardarTransecta() {
+    if (!muestrasActuales.length) { mostrarAlerta("Tomá muestras primero."); return; }
+    const lote = lotes[document.getElementById('loteSelect').value]?.nombre || "Lote";
+    const curva = curvas.find(c => c.id == parseInt(document.getElementById('curvaSelect').value)) || curvas[0];
+    const total = muestrasActuales.length;
+    const promCm = (muestrasActuales.reduce((a, b) => a + b.cm, 0) / total).toFixed(1);
+    const promKg = Math.round(muestrasActuales.reduce((a, b) => a + b.kgMs, 0) / total);
+    historial.unshift({ id: Date.now(), tipo: 'transecta_completa', fecha: new Date().toLocaleDateString('es-AR'), lote, curva: curva.nombre, muestras: total, promCm, promKg, puntosGPS: muestrasActuales.slice(), sincronizado: false });
+    guardarStorage('pastagro_historial', JSON.stringify(historial));
+    muestrasActuales = []; borrarStorage('pastagro_muestras');
+    actualizarResumen(); actualizarEstadoSync();
+    sincronizarConSheets();
+  }
+
+  function actualizarEstadoSync() {
+    const pend = historial.filter(h => !h.sincronizado).length;
+    const btn = document.getElementById('btnSync');
+    if (pend > 0) { btn.innerText = `☁️ Subir (${pend})`; btn.classList.add('pendiente'); }
+    else { btn.innerText = `☁️ Al día`; btn.classList.remove('pendiente'); }
+  }
+
+  async function sincronizarConSheets() {
+    const pend = historial.filter(h => !h.sincronizado);
+    if (!pend.length) return;
+    if (!gasUrl) { mostrarAlerta("Guardado en Cola. Pegá la URL /exec en Ajustes para subir."); return; }
+    for (const item of pend) {
+      try {
+        await fetch(gasUrl, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(item) });
+        item.sincronizado = true;
+      } catch (e) {}
+    }
+    historial = historial.filter(h => !h.sincronizado);
+    guardarStorage('pastagro_historial', JSON.stringify(historial));
+    actualizarEstadoSync(); renderHistorial();
+    mostrarAlerta("Datos enviados a Google Sheets.");
+  }
+
+  function renderHistorial() {
+    const cont = document.getElementById('listaHistorial');
+    if (!historial.length) { cont.innerHTML = "<p style='color:var(--muted); font-size:0.9rem;'>Cola vacía.</p>"; return; }
+    cont.innerHTML = historial.map(h => `<div class="sample-item"><div><strong>${h.lote}</strong><br><small style="color:var(--muted)">${h.fecha} · ${h.muestras} muestras</small></div><strong>${h.promKg} kg MS/ha</strong></div>`).join('');
+  }
+
+  function crearCapaBase(tipo) {
+    if (tipo === 'google_sat') return L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 });
+    if (tipo === 'esri_sat') return L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 });
+    if (tipo === 'osm') return L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 });
+    return L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 20 });
+  }
+
+  function inicializarMapaPastagro() {
+    if (mapaPastagro) return;
+    mapaPastagro = L.map('mapaPastagro', { maxZoom: 20 }).setView([-35.638, -59.776], 14);
+    capaBaseActual = crearCapaBase(document.getElementById('capaBaseMapa')?.value || 'google_hybrid').addTo(mapaPastagro);
+    capaPuntosMapa = L.layerGroup().addTo(mapaPastagro);
+  }
+
+  function cambiarCapaBaseMapa() {
+    if (!mapaPastagro) inicializarMapaPastagro();
+    if (capaBaseActual) mapaPastagro.removeLayer(capaBaseActual);
+    capaBaseActual = crearCapaBase(document.getElementById('capaBaseMapa').value).addTo(mapaPastagro);
+    if (capaPuntosMapa) capaPuntosMapa.bringToFront();
+  }
+
+  function cargarMapaMediciones() {
+    inicializarMapaPastagro();
+    setTimeout(() => { if (mapaPastagro) mapaPastagro.invalidateSize(); }, 200);
+    recorridasMapa = historial
+      .filter(h => Array.isArray(h.puntosGPS) && h.puntosGPS.some(p => p.lat && p.lng))
+      .map((h, idx) => ({ id: 'local_' + (h.id || idx), fecha: h.fecha, lote: h.lote, promKg: h.promKg, puntosGPS: h.puntosGPS }));
+    poblarFiltroLotesMapa();
+  }
+
+  function poblarFiltroLotesMapa() {
+    const selLote = document.getElementById('filtroLoteMapa');
+    const lotesUnicos = [...new Set(recorridasMapa.map(r => r.lote))];
+    selLote.innerHTML = '<option value="">Todos los lotes</option>' + lotesUnicos.map(l => `<option value="${l}">${l}</option>`).join('');
+    poblarSelectRecorridasMapa();
+  }
+
+  function poblarSelectRecorridasMapa() {
+    const loteSel = document.getElementById('filtroLoteMapa').value;
+    const selRec = document.getElementById('filtroRecorridaMapa');
+    const filtradas = loteSel ? recorridasMapa.filter(r => r.lote === loteSel) : recorridasMapa;
+    if (!filtradas.length) {
+      selRec.innerHTML = '<option value="">Sin recorridas con GPS</option>';
+      if (capaPuntosMapa) capaPuntosMapa.clearLayers();
+      return;
+    }
+    selRec.innerHTML = filtradas.map(r => `<option value="${r.id}">${r.fecha} · ${r.lote} (${r.promKg} kg MS/ha)</option>`).join('');
+    dibujarPuntosEnMapa();
+  }
+
+  function dibujarPuntosEnMapa() {
+    if (!capaPuntosMapa) return;
+    capaPuntosMapa.clearLayers();
+    const rec = recorridasMapa.find(r => String(r.id) === String(document.getElementById('filtroRecorridaMapa').value));
+    if (!rec) return;
+    const prom = Number(rec.promKg) || 0;
+    const coords = [];
+    rec.puntosGPS.forEach((p, i) => {
+      if (!p.lat || !p.lng) return;
+      coords.push([Number(p.lat), Number(p.lng)]);
+      let color = '#eab308';
+      if (prom > 0 && p.kgMs >= prom * 1.1) color = '#22c55e';
+      if (prom > 0 && p.kgMs <= prom * 0.9) color = '#ef4444';
+      L.circleMarker([Number(p.lat), Number(p.lng)], {
+        radius: 8, fillColor: color, color: '#ffffff', weight: 2, opacity: 1, fillOpacity: 0.9
+      }).bindPopup(`<b>Muestra #${i + 1}</b> (${rec.lote})<br>Disponibilidad: <b>${p.kgMs} kg MS/ha</b><br>Valor: ${p.cm} cm`).addTo(capaPuntosMapa);
+    });
+    if (coords.length && mapaPastagro) mapaPastagro.fitBounds(coords, { padding: [30, 30], maxZoom: 18 });
+  }
+</script>
 </body>
 </html>
