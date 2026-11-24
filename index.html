@@ -510,50 +510,99 @@
 
   function detectarDiametroPx(video, canvas) {
     if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return null;
-    const w = 160;
-    const h = Math.round((video.videoHeight / video.videoWidth) * w) || 120;
-    canvas.width = w; canvas.height = h;
+    const w = 240;
+    const h = Math.round((video.videoHeight / video.videoWidth) * w) || 180;
+    canvas.width = w;
+    canvas.height = h;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(video, 0, 0, w, h);
     const d = ctx.getImageData(0, 0, w, h).data;
 
-    let sumBorde = 0, nBorde = 0;
-    for (let y = 0; y < h; y += 2) {
-      for (let x = 0; x < w; x += 2) {
-        if (x < w * 0.16 || x > w * 0.84 || y < h * 0.16 || y > h * 0.84) {
-          const i = (y * w + x) * 4;
-          sumBorde += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-          nBorde++;
+    // Calcula luminancia de cada píxel
+    const lum = new Float32Array(w * h);
+    for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+      lum[p] = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    }
+
+    // Escanea bloques/cuadrados candidatos de 4x4 px con fuerte contraste local
+    const candidatos = [];
+    const paso = 2;
+    const tamBloque = 4;
+
+    for (let y = tamBloque; y < h - tamBloque * 2; y += paso) {
+      for (let x = tamBloque; x < w - tamBloque * 2; x += paso) {
+        let suma = 0;
+        let minB = 255;
+        let maxB = 0;
+        for (let dy = 0; dy < tamBloque; dy++) {
+          for (let dx = 0; dx < tamBloque; dx++) {
+            const v = lum[(y + dy) * w + (x + dx)];
+            suma += v;
+            if (v < minB) minB = v;
+            if (v > maxB) maxB = v;
+          }
+        }
+        const promBloque = suma / (tamBloque * tamBloque);
+        const uniformidadInterna = maxB - minB;
+
+        // Promedio de la corona vecina para verificar contraste con el entorno
+        let sumaVec = 0;
+        let nVec = 0;
+        for (let dy = -2; dy < tamBloque + 2; dy++) {
+          for (let dx = -2; dx < tamBloque + 2; dx++) {
+            if (dx >= 0 && dx < tamBloque && dy >= 0 && dy < tamBloque) continue;
+            sumaVec += lum[(y + dy) * w + (x + dx)];
+            nVec++;
+          }
+        }
+        const promVec = nVec ? sumaVec / nVec : promBloque;
+        const contrasteEntorno = Math.abs(promBloque - promVec);
+
+        // Cuadrado limpio por dentro y con buen contraste respecto al fondo
+        if (uniformidadInterna <= 42 && contrasteEntorno >= 28) {
+          candidatos.push({
+            x: x + tamBloque / 2,
+            y: y + tamBloque / 2,
+            claro: promBloque >= promVec
+          });
         }
       }
     }
-    const umbralClaro = Math.max(75, Math.min(238, (nBorde ? sumBorde / nBorde : 90) + 24));
-    let sumX = 0, sumY = 0, count = 0;
-    const pts = [];
-    for (let y = 4; y < h - 4; y += 2) {
-      for (let x = 4; x < w - 4; x += 2) {
-        const i = (y * w + x) * 4;
-        const r = d[i], g = d[i + 1], b = d[i + 2];
-        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-        const dif = Math.max(r, g, b) - Math.min(r, g, b);
-        if (lum >= umbralClaro && lum <= 250 && dif <= 55) {
-          sumX += x; sumY += y; count++; pts.push([x, y]);
-        }
-      }
+
+    // Si no hay suficientes cuadrados/bloques con contraste, no hay plato válido
+    if (candidatos.length < 6) return null;
+
+    // Agrupa los candidatos cercanos para aislar el plato y descartar ruido suelto
+    const cx = candidatos.reduce((a, c) => a + c.x, 0) / candidatos.length;
+    const cy = candidatos.reduce((a, c) => a + c.y, 0) / candidatos.length;
+    const radioMax = Math.min(w, h) * 0.42;
+
+    const grupo = candidatos.filter(c => Math.hypot(c.x - cx, c.y - cy) <= radioMax);
+    if (grupo.length < 6) return null;
+
+    let minX = w, maxX = 0, minY = h, maxY = 0;
+    for (const c of grupo) {
+      if (c.x < minX) minX = c.x;
+      if (c.x > maxX) maxX = c.x;
+      if (c.y < minY) minY = c.y;
+      if (c.y > maxY) maxY = c.y;
     }
-    if (count < 20) return null;
-    const cx = sumX / count, cy = sumY / count;
-    let minX = w, maxX = 0, minY = h, maxY = 0, validos = 0;
-    for (const [px, py] of pts) {
-      if (Math.hypot(px - cx, py - cy) <= Math.min(w, h) * 0.46) {
-        validos++;
-        if (px < minX) minX = px; if (px > maxX) maxX = px;
-        if (py < minY) minY = py; if (py > maxY) maxY = py;
-      }
-    }
-    const ancho = maxX - minX, alto = maxY - minY;
-    if (validos < 20 || Math.max(ancho, alto) < 18) return null;
-    return (ancho + alto) / 2;
+
+    const ancho = maxX - minX;
+    const alto = maxY - minY;
+    const diam = (ancho + alto) / 2;
+
+    if (ancho < 16 || alto < 16) return null;
+
+    // El plato visto desde arriba o en ángulo moderado no es una tira ultra angosta
+    const relacionAspecto = Math.max(ancho, alto) / Math.max(1, Math.min(ancho, alto));
+    if (relacionAspecto > 1.75) return null;
+
+    // Coherencia con la referencia de 0 cm
+    const ref0 = diametro0Px || 52;
+    if (diam < ref0 * 0.3 || diam > ref0 * 2.5) return null;
+
+    return diam;
   }
 
   async function capturarDiametroCamara() {
