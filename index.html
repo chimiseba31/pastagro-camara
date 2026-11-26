@@ -62,8 +62,16 @@
     .sample-list { max-height: 220px; overflow-y: auto; border-top: 1px solid var(--border); }
     .sample-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 4px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
 
-    video { width: 100%; max-height: 230px; object-fit: cover; border-radius: 12px; background: #000; display: none; margin-bottom: 10px; border: 2px solid var(--accent); }
-    video.activa { display: block; }
+    video {
+      position: fixed;
+      right: 0;
+      bottom: 0;
+      width: 2px;
+      height: 2px;
+      opacity: 0.01;
+      pointer-events: none;
+      border: none;
+    }
 
     .curvas-banner { background: linear-gradient(135deg, #1b4332, #2d6a4f); color: white; border-radius: 16px; padding: 16px; margin-bottom: 14px; }
     .curvas-banner h2 { color: white; font-size: 1.2rem; margin-bottom: 2px; }
@@ -254,7 +262,7 @@
   <!-- SECCIÓN 3: AJUSTES Y CURVAS -->
   <div id="sec-curvas" class="section">
     <div id="vistaCurvasPrincipal">
-      <div class="card">
+      <div class="card" style="display: none;">
         <h2>Conexión con Google Apps Script (/exec)</h2>
         <label>URL Web App de Google Apps Script</label>
         <input type="url" id="gasUrlInput" placeholder="https://script.google.com/macros/s/.../exec" onchange="guardarGasUrl()">
@@ -302,10 +310,7 @@
           <div><label>Diámetro plato (cm)</label><input type="number" id="diametroPlatoReal" step="0.1" value="35.6"></div>
           <div><label>Distancia base 0 cm (cm)</label><input type="number" id="distanciaCelularPlatoCm" step="1" value="80"></div>
         </div>
-        <div class="row-2">
-          <div><label>Diámetro 0 cm (px)</label><input type="number" id="diametro0PxInput" step="0.5" value="52"></div>
-          <div><label>Calibración rápida</label><button type="button" class="btn btn-outline" style="padding:10px; font-size:0.85rem;" onclick="calibrarCeroCamara()">🎯 Calibrar 0 cm</button></div>
-        </div>
+        <button type="button" class="btn btn-outline" style="margin-bottom:10px; padding:10px; font-size:0.88rem;" onclick="calibrarCeroCamara()">🎯 Calibrar 0 cm</button>
         <button type="button" class="btn btn-primary" style="padding:11px; font-size:0.86rem;" onclick="guardarCalibracionVision()">Guardar Ajustes</button>
       </div>
 
@@ -409,7 +414,8 @@
     catch (e) { return fallback; }
   }
 
-  let gasUrl = leerStorage('pastagro_gas_url') || '';
+  const URL_GAS_POR_DEFECTO = 'https://script.google.com/macros/s/TU_ID_AQUI/exec';
+  let gasUrl = leerStorage('pastagro_gas_url') || URL_GAS_POR_DEFECTO;
   let diametroPlatoReal = parseFloat(leerStorage('pastagro_vision_diametro')) || 35.6;
   let distanciaCelularPlatoCm = parseFloat(leerStorage('pastagro_distancia_plato_cm')) || 80;
   let diametro0Px = parseFloat(leerStorage('pastagro_diametro_0_px')) || 52;
@@ -447,15 +453,6 @@
     modalCallback = null;
   }
 
-  function mostrarConfirmacion(mensaje, callback, titulo = "🌱 Confirmar acción", textoOk = "Aceptar") {
-    document.getElementById('modalTitle').innerText = titulo;
-    document.getElementById('modalMessage').innerText = mensaje;
-    document.getElementById('modalBtnCancel').style.display = 'block';
-    document.getElementById('modalBtnOk').innerText = textoOk;
-    document.getElementById('modalOverlay').style.display = 'flex';
-    modalCallback = callback;
-  }
-
   function cerrarModal(confirmado) {
     document.getElementById('modalOverlay').style.display = 'none';
     if (modalCallback) { const cb = modalCallback; modalCallback = null; cb(confirmado); }
@@ -476,10 +473,11 @@
   }
 
   window.onload = function() {
+    gasUrl = gasUrl || URL_GAS_POR_DEFECTO;
+    guardarStorage('pastagro_gas_url', gasUrl);
     document.getElementById('gasUrlInput').value = gasUrl;
     document.getElementById('diametroPlatoReal').value = diametroPlatoReal;
     document.getElementById('distanciaCelularPlatoCm').value = distanciaCelularPlatoCm;
-    document.getElementById('diametro0PxInput').value = diametro0Px;
     iniciarGPS();
     poblarSelectores();
     aplicarLoteCalculadora();
@@ -494,14 +492,15 @@
   };
 
   function guardarGasUrl() {
-    gasUrl = document.getElementById('gasUrlInput').value.trim();
+    const valor = document.getElementById('gasUrlInput').value.trim();
+    gasUrl = valor || URL_GAS_POR_DEFECTO;
+    document.getElementById('gasUrlInput').value = gasUrl;
     guardarStorage('pastagro_gas_url', gasUrl);
   }
 
   function guardarCalibracionVision() {
     diametroPlatoReal = parseFloat(document.getElementById('diametroPlatoReal').value) || 35.6;
     distanciaCelularPlatoCm = parseFloat(document.getElementById('distanciaCelularPlatoCm').value) || 80;
-    diametro0Px = parseFloat(document.getElementById('diametro0PxInput').value) || 52;
     guardarStorage('pastagro_vision_diametro', diametroPlatoReal);
     guardarStorage('pastagro_distancia_plato_cm', distanciaCelularPlatoCm);
     guardarStorage('pastagro_diametro_0_px', diametro0Px);
@@ -518,13 +517,11 @@
     ctx.drawImage(video, 0, 0, w, h);
     const d = ctx.getImageData(0, 0, w, h).data;
 
-    // Calcula luminancia de cada píxel
     const lum = new Float32Array(w * h);
     for (let i = 0, p = 0; i < d.length; i += 4, p++) {
       lum[p] = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
     }
 
-    // Escanea bloques/cuadrados candidatos de 4x4 px con fuerte contraste local
     const candidatos = [];
     const paso = 2;
     const tamBloque = 4;
@@ -545,7 +542,6 @@
         const promBloque = suma / (tamBloque * tamBloque);
         const uniformidadInterna = maxB - minB;
 
-        // Promedio de la corona vecina para verificar contraste con el entorno
         let sumaVec = 0;
         let nVec = 0;
         for (let dy = -2; dy < tamBloque + 2; dy++) {
@@ -558,21 +554,17 @@
         const promVec = nVec ? sumaVec / nVec : promBloque;
         const contrasteEntorno = Math.abs(promBloque - promVec);
 
-        // Cuadrado limpio por dentro y con buen contraste respecto al fondo
         if (uniformidadInterna <= 42 && contrasteEntorno >= 28) {
           candidatos.push({
             x: x + tamBloque / 2,
-            y: y + tamBloque / 2,
-            claro: promBloque >= promVec
+            y: y + tamBloque / 2
           });
         }
       }
     }
 
-    // Si no hay suficientes cuadrados/bloques con contraste, no hay plato válido
     if (candidatos.length < 6) return null;
 
-    // Agrupa los candidatos cercanos para aislar el plato y descartar ruido suelto
     const cx = candidatos.reduce((a, c) => a + c.x, 0) / candidatos.length;
     const cy = candidatos.reduce((a, c) => a + c.y, 0) / candidatos.length;
     const radioMax = Math.min(w, h) * 0.42;
@@ -594,11 +586,9 @@
 
     if (ancho < 16 || alto < 16) return null;
 
-    // El plato visto desde arriba o en ángulo moderado no es una tira ultra angosta
     const relacionAspecto = Math.max(ancho, alto) / Math.max(1, Math.min(ancho, alto));
     if (relacionAspecto > 1.75) return null;
 
-    // Coherencia con la referencia de 0 cm
     const ref0 = diametro0Px || 52;
     if (diam < ref0 * 0.3 || diam > ref0 * 2.5) return null;
 
@@ -620,11 +610,10 @@
         audio: false
       });
       video.srcObject = stream;
-      video.classList.add('activa');
       await video.play();
       estado.innerText = "Detectando plato...";
       const muestrasPx = [];
-      for (let i = 0; i < 25; i++) {
+      for (let i = 0; i < 30; i++) {
         await new Promise(r => setTimeout(r, 70));
         const px = detectarDiametroPx(video, canvas);
         if (px !== null) { muestrasPx.push(px); if (muestrasPx.length >= 3) break; }
@@ -635,7 +624,6 @@
       if (stream) stream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
       try { video.pause(); } catch (e) {}
       video.srcObject = null;
-      video.classList.remove('activa');
     }
   }
 
@@ -644,9 +632,8 @@
       const px = await capturarDiametroCamara();
       if (!px) { mostrarAlerta("No se detectó el plato en 0 cm."); return; }
       diametro0Px = px;
-      document.getElementById('diametro0PxInput').value = px;
       guardarStorage('pastagro_diametro_0_px', px);
-      mostrarAlerta(`Referencia 0 cm calibrada en ${px} px.`);
+      mostrarAlerta(`Referencia 0 cm calibrada (${px} px).`);
     } catch (e) { mostrarAlerta("No se pudo abrir la cámara: " + (e.message || e)); }
   }
 
@@ -696,7 +683,7 @@
     mostrarAlerta(`Curva "${p.nombre}" agregada.`);
   }
 
-  function iniciarNuevaCurva(modo) {
+  function iniciarNuevaCurva() {
     const hoy = new Date();
     borradorActivo = { id: Date.now(), nombre: `Pastura ${hoy.getDate()}/${hoy.getMonth() + 1}`, muestras: [{ cm: '', fresco: '', seco: '' }] };
     document.getElementById('vistaCurvasPrincipal').style.display = 'none';
@@ -991,8 +978,8 @@
   function guardarCalculoPastoreo() {
     const d = calcularPastoreo();
     const lote = lotes[document.getElementById('calcLoteSelect').value]?.nombre || "Lote";
-    if (!gasUrl) { mostrarAlerta(`Resultado: ${d.dias} días. Configurá la URL /exec en Ajustes para enviar a Sheets.`); return; }
-    fetch(gasUrl, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ tipo: 'pastoreo', fecha: new Date().toLocaleDateString('es-AR'), lote, hectareas: d.ha, cabezas: d.cab, pesoVivo: d.pes, forrajeAprovechableTotal: d.total, dias: d.dias }) })
+    const urlEnvio = gasUrl || URL_GAS_POR_DEFECTO;
+    fetch(urlEnvio, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ tipo: 'pastoreo', fecha: new Date().toLocaleDateString('es-AR'), lote, hectareas: d.ha, cabezas: d.cab, pesoVivo: d.pes, forrajeAprovechableTotal: d.total, dias: d.dias }) })
       .then(() => mostrarAlerta("Planificación enviada a Google Sheets."))
       .catch(() => mostrarAlerta("Sin conexión para enviar."));
   }
@@ -1063,10 +1050,10 @@
   async function sincronizarConSheets() {
     const pend = historial.filter(h => !h.sincronizado);
     if (!pend.length) return;
-    if (!gasUrl) { mostrarAlerta("Guardado en Cola. Pegá la URL /exec en Ajustes para subir."); return; }
+    const urlEnvio = gasUrl || URL_GAS_POR_DEFECTO;
     for (const item of pend) {
       try {
-        await fetch(gasUrl, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(item) });
+        await fetch(urlEnvio, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(item) });
         item.sincronizado = true;
       } catch (e) {}
     }
